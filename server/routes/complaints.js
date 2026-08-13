@@ -1,8 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { dbAll, dbGet, dbRun } from '../db.js';
 import { authenticateToken } from './auth.js';
 import { findResponsibleSachivalayam, calculateHaversineDistance } from '../services/sachivalayamService.js';
@@ -10,26 +7,8 @@ import { reverseGeocode } from '../services/addressService.js';
 
 const router = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Multer storage setup
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, 'civic-' + uniqueSuffix + ext);
-  }
-});
-
+// Use Memory Storage for 100% Serverless Cloud Compatibility (Zero EROFS Read-Only Disk Errors)
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB max
@@ -78,7 +57,9 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
 
     let imageUrl = null;
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      const mime = req.file.mimetype || 'image/jpeg';
+      const b64 = req.file.buffer.toString('base64');
+      imageUrl = `data:${mime};base64,${b64}`;
     } else if (req.body.image_url) {
       imageUrl = req.body.image_url;
     } else {
@@ -182,7 +163,6 @@ router.get('/nearby', async (req, res) => {
       const distKm = calculateHaversineDistance(latitude, longitude, comp.lat, comp.lng);
       const distMeters = distKm * 1000;
 
-      // If within 150 meters and same category (or within 50m for any category)
       if (distMeters <= 150 && (!category_id || comp.category_id === category_id)) {
         duplicates.push({
           ...comp,
@@ -255,7 +235,7 @@ router.get('/my', authenticateToken, async (req, res) => {
   }
 });
 
-// 5. Get All Complaints (With filters for Map, Admin, Official)
+// 5. Get All Complaints
 router.get('/', async (req, res) => {
   try {
     const { status, sachivalayam_id, priority, category_id, search } = req.query;
@@ -336,7 +316,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 7. Official Update Status (UNDER_REVIEW, IN_PROGRESS, REJECTED)
+// 7. Official Update Status
 router.patch('/:id/status', authenticateToken, async (req, res) => {
   try {
     const { status, remarks, priority } = req.body;
@@ -355,14 +335,12 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
       [status, newPriority, complaintId]
     );
 
-    // Log status history
     await dbRun(
       `INSERT INTO complaint_status_history (complaint_id, old_status, new_status, changed_by, changed_by_name, remarks)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [complaintId, oldStatus, status, req.user.id, req.user.name, remarks || `Status changed to ${status}`]
     );
 
-    // Notify Citizen
     await dbRun(
       `INSERT INTO notifications (user_id, complaint_id, message) VALUES (?, ?, ?)`,
       [
@@ -378,7 +356,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// 8. Official Resolve Complaint (Upload Resolution Photo + Remarks)
+// 8. Official Resolve Complaint
 router.post('/:id/resolve', authenticateToken, upload.single('resolution_image'), async (req, res) => {
   try {
     const complaintId = req.params.id;
@@ -391,7 +369,9 @@ router.post('/:id/resolve', authenticateToken, upload.single('resolution_image')
 
     let resolutionImageUrl = null;
     if (req.file) {
-      resolutionImageUrl = `/uploads/${req.file.filename}`;
+      const mime = req.file.mimetype || 'image/jpeg';
+      const b64 = req.file.buffer.toString('base64');
+      resolutionImageUrl = `data:${mime};base64,${b64}`;
     } else if (req.body.resolution_image_url) {
       resolutionImageUrl = req.body.resolution_image_url;
     } else {
@@ -407,14 +387,12 @@ router.post('/:id/resolve', authenticateToken, upload.single('resolution_image')
       [resolutionImageUrl, remarks || 'Issue successfully inspected and resolved on site.', complaintId]
     );
 
-    // Log status history
     await dbRun(
       `INSERT INTO complaint_status_history (complaint_id, old_status, new_status, changed_by, changed_by_name, remarks)
        VALUES (?, ?, 'RESOLVED', ?, ?, ?)`,
       [complaintId, oldStatus, req.user.id, req.user.name, remarks || 'Issue resolved and after photo uploaded.']
     );
 
-    // Notify Citizen to inspect & confirm
     await dbRun(
       `INSERT INTO notifications (user_id, complaint_id, message) VALUES (?, ?, ?)`,
       [
@@ -434,7 +412,7 @@ router.post('/:id/resolve', authenticateToken, upload.single('resolution_image')
   }
 });
 
-// 9. Citizen Confirm Resolution (Confirm YES -> Stay RESOLVED / NO -> REOPENED)
+// 9. Citizen Confirm Resolution
 router.post('/:id/confirm-resolution', authenticateToken, async (req, res) => {
   try {
     const complaintId = req.params.id;
@@ -450,7 +428,6 @@ router.post('/:id/confirm-resolution', authenticateToken, async (req, res) => {
     }
 
     if (confirmed_solved) {
-      // Citizen approves!
       await dbRun(
         `INSERT INTO complaint_status_history (complaint_id, old_status, new_status, changed_by, changed_by_name, remarks)
          VALUES (?, 'RESOLVED', 'RESOLVED', ?, ?, ?)`,
@@ -459,7 +436,6 @@ router.post('/:id/confirm-resolution', authenticateToken, async (req, res) => {
 
       return res.json({ message: 'Thank you for confirming! Problem officially closed.' });
     } else {
-      // Citizen rejects -> REOPENED!
       const oldStatus = complaint.status;
 
       await dbRun(
@@ -473,7 +449,6 @@ router.post('/:id/confirm-resolution', authenticateToken, async (req, res) => {
         [complaintId, oldStatus, req.user.id, req.user.name, `Citizen reported problem STILL PERSISTS: "${citizen_feedback || 'Issue not properly fixed'}"`]
       );
 
-      // Notify Sachivalayam official and Admin
       if (complaint.assigned_official_id) {
         await dbRun(
           `INSERT INTO notifications (user_id, complaint_id, message) VALUES (?, ?, ?)`,

@@ -1,54 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import CameraCapture from '../components/CameraCapture';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import InteractiveMap from '../components/InteractiveMap';
 import { 
   Building2, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  RefreshCw, 
-  Upload, 
   MapPin, 
-  ShieldAlert, 
+  Clock, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Upload, 
   Play, 
-  Check, 
-  XCircle,
-  FileText,
-  SlidersHorizontal,
-  ExternalLink,
+  XCircle, 
+  Sparkles,
+  Filter,
+  Search,
+  Check,
   ChevronRight
 } from 'lucide-react';
 
 export default function OfficialDashboard() {
   const { user } = useAuth();
+
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  
-  // Selected complaint modal state
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [selectedComplaint, setSelectedComplaint] = useState(null);
-  const [statusRemarks, setStatusRemarks] = useState('');
-
-  // Resolution upload state
   const [showResolveModal, setShowResolveModal] = useState(false);
-  const [resolutionFile, setResolutionFile] = useState(null);
-  const [resolutionDataUrl, setResolutionDataUrl] = useState(null);
   const [resolutionRemarks, setResolutionRemarks] = useState('');
-  const [submittingResolution, setSubmittingResolution] = useState(false);
+  const [resolutionFile, setResolutionFile] = useState(null);
+  const [resolutionPreview, setResolutionPreview] = useState(null);
+  const [submittingResolve, setSubmittingResolve] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
 
   useEffect(() => {
-    fetchAssignedComplaints();
-  }, [statusFilter]);
+    fetchOfficialComplaints();
+  }, [user]);
 
-  const fetchAssignedComplaints = async () => {
+  const fetchOfficialComplaints = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('civicfix_token');
-      const url = statusFilter === 'ALL' ? '/api/complaints' : `/api/complaints?status=${statusFilter}`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const sachId = user?.sachivalayam_id || '';
+      const res = await fetch(`/api/complaints?sachivalayam_id=${sachId}`);
       if (res.ok) {
         const data = await res.json();
         setComplaints(data.complaints || []);
@@ -61,6 +54,8 @@ export default function OfficialDashboard() {
   };
 
   const handleStatusUpdate = async (complaintId, newStatus) => {
+    setActionError(null);
+    setActionSuccess(null);
     try {
       const token = localStorage.getItem('civicfix_token');
       const res = await fetch(`/api/complaints/${complaintId}/status`, {
@@ -71,242 +66,281 @@ export default function OfficialDashboard() {
         },
         body: JSON.stringify({
           status: newStatus,
-          remarks: statusRemarks || `Updated to ${newStatus}`
+          remarks: `Status updated to ${newStatus} by Sachivalayam official.`
         })
       });
 
       if (res.ok) {
-        setStatusRemarks('');
-        setSelectedComplaint(null);
-        fetchAssignedComplaints();
+        setActionSuccess(`Complaint status successfully updated to ${newStatus}`);
+        fetchOfficialComplaints();
+        if (selectedComplaint && selectedComplaint.id === complaintId) {
+          setSelectedComplaint(prev => ({ ...prev, status: newStatus }));
+        }
+      } else {
+        const data = await res.json();
+        setActionError(data.error || 'Failed to update status');
       }
     } catch (err) {
-      console.error('Status update error:', err);
+      setActionError('Network error updating complaint status.');
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setResolutionFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResolutionPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleResolveSubmit = async (e) => {
     e.preventDefault();
-    if (!resolutionFile && !resolutionDataUrl) {
-      alert('Photo evidence of resolution is required!');
+    if (!resolutionFile && !resolutionPreview) {
+      setActionError('Photo evidence of resolution is required before marking as RESOLVED!');
       return;
     }
 
-    setSubmittingResolution(true);
+    setSubmittingResolve(true);
+    setActionError(null);
+    setActionSuccess(null);
+
     try {
-      const formData = new FormData();
-      if (resolutionFile) formData.append('resolution_image', resolutionFile);
-      else if (resolutionDataUrl) formData.append('resolution_image_url', resolutionDataUrl);
-
-      formData.append('remarks', resolutionRemarks || 'Issue fixed on site.');
-
       const token = localStorage.getItem('civicfix_token');
+      const formData = new FormData();
+      if (resolutionFile) {
+        formData.append('resolution_image', resolutionFile);
+      } else if (resolutionPreview) {
+        formData.append('resolution_image_url', resolutionPreview);
+      }
+
+      formData.append('remarks', resolutionRemarks || 'Issue inspected on ground and resolved satisfactorily.');
+
       const res = await fetch(`/api/complaints/${selectedComplaint.id}/resolve`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
         body: formData
       });
 
+      const data = await res.json();
       if (res.ok) {
+        setActionSuccess('🎉 Complaint successfully marked RESOLVED with proof of work!');
         setShowResolveModal(false);
-        setSelectedComplaint(null);
         setResolutionFile(null);
-        setResolutionDataUrl(null);
+        setResolutionPreview(null);
         setResolutionRemarks('');
-        fetchAssignedComplaints();
+        fetchOfficialComplaints();
+        setSelectedComplaint(null);
       } else {
-        const errData = await res.json();
-        alert(errData.error || 'Failed to submit resolution proof');
+        setActionError(data.error || 'Failed to resolve complaint');
       }
     } catch (err) {
-      console.error('Resolve error:', err);
+      setActionError('Network error uploading resolution evidence.');
     } finally {
-      setSubmittingResolution(false);
+      setSubmittingResolve(false);
     }
   };
 
-  // Compute Statistics
-  const totalCount = complaints.length;
-  const newCount = complaints.filter(c => c.status === 'SUBMITTED' || c.status === 'ASSIGNED').length;
-  const inProgressCount = complaints.filter(c => c.status === 'IN_PROGRESS').length;
-  const resolvedCount = complaints.filter(c => c.status === 'RESOLVED').length;
-  const reopenedCount = complaints.filter(c => c.status === 'REOPENED').length;
+  const filteredComplaints = complaints.filter(c => {
+    if (filterStatus === 'ALL') return true;
+    return c.status === filterStatus;
+  });
+
+  const getDirectionsUrl = (comp) => {
+    if (!comp) return '#';
+    let lat = comp.lat;
+    let lng = comp.lng;
+    if (lat > 50 && lng < 50) {
+      const temp = lat;
+      lat = lng;
+      lng = temp;
+    }
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-6 h-6 text-amber-400" />
-              <span className="text-xs uppercase font-extrabold text-amber-400 tracking-wider">AP Grama/Ward Sachivalayam Official Portal</span>
+        {/* Header Officer Dashboard Bar */}
+        <div className="glass-card p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-              {user?.sachivalayam_id ? 'Patamata Ward Sachivalayam 14' : 'Grama/Ward Sachivalayam Workspace'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Logged in as: <strong className="text-slate-200">{user?.name}</strong> • Phone: +91 98480 12345
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-extrabold text-white">Sachivalayam Official Workbench</h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono text-[10px] uppercase font-bold border border-amber-500/30">
+                  AP Official
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Logged in as <strong className="text-slate-200">{user?.name}</strong> • Assigned Jurisdiction:{' '}
+                <span className="text-emerald-400 font-bold">{user?.sachivalayam_id ? 'Patamata / Gudivada Ward Sachivalayam' : 'AP Central Portal'}</span>
+              </p>
+            </div>
           </div>
 
-          <button
-            onClick={fetchAssignedComplaints}
-            className="self-start md:self-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Feed
-          </button>
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="glass-card p-5 rounded-2xl border border-slate-800">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Issues</div>
-            <div className="text-2xl font-black text-white">{totalCount}</div>
-          </div>
-
-          <div className="glass-card p-5 rounded-2xl border border-blue-500/30">
-            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">New / Assigned</div>
-            <div className="text-2xl font-black text-blue-400">{newCount}</div>
-          </div>
-
-          <div className="glass-card p-5 rounded-2xl border border-amber-500/30">
-            <div className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">In Progress</div>
-            <div className="text-2xl font-black text-amber-400">{inProgressCount}</div>
-          </div>
-
-          <div className="glass-card p-5 rounded-2xl border border-emerald-500/30">
-            <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Resolved</div>
-            <div className="text-2xl font-black text-emerald-400">{resolvedCount}</div>
-          </div>
-
-          <div className="glass-card p-5 rounded-2xl border border-red-500/30 col-span-2 lg:col-span-1">
-            <div className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Reopened Alert</div>
-            <div className="text-2xl font-black text-red-400">{reopenedCount}</div>
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-center">
+              <div className="text-xs text-slate-400">Assigned Pending</div>
+              <div className="text-lg font-black text-amber-400">
+                {complaints.filter(c => c.status !== 'RESOLVED').length}
+              </div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-center">
+              <div className="text-xs text-slate-400">Total Solved</div>
+              <div className="text-lg font-black text-emerald-400">
+                {complaints.filter(c => c.status === 'RESOLVED').length}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
-          {['ALL', 'SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REOPENED', 'REJECTED'].map((st) => (
+        {actionSuccess && (
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <span>{actionSuccess}</span>
+          </div>
+        )}
+
+        {actionError && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>{actionError}</span>
+          </div>
+        )}
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {['ALL', 'SUBMITTED', 'IN_PROGRESS', 'REOPENED', 'RESOLVED'].map((st) => (
             <button
               key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition ${
-                statusFilter === st
-                  ? 'bg-amber-500 text-slate-950 shadow-lg'
-                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800'
+              onClick={() => setFilterStatus(st)}
+              className={`px-4 py-2 rounded-xl font-extrabold text-xs whitespace-nowrap transition ${
+                filterStatus === st
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {st}
+              {st === 'ALL' ? 'All Assigned Issues' : st}
             </button>
           ))}
         </div>
 
-        {/* Main Complaints List Cards */}
+        {/* Complaints Grid & Drawer View */}
         {loading ? (
-          <div className="text-center py-20 text-slate-500">Loading complaints...</div>
-        ) : complaints.length === 0 ? (
-          <div className="glass-card p-12 rounded-3xl text-center text-slate-400 space-y-2">
-            <Building2 className="w-10 h-10 text-slate-600 mx-auto" />
-            <h3 className="text-base font-bold text-slate-200">No complaints matching filter</h3>
+          <div className="text-center py-12 text-slate-500 text-xs">Loading assigned Sachivalayam complaints...</div>
+        ) : filteredComplaints.length === 0 ? (
+          <div className="glass-card p-12 rounded-3xl border border-slate-800 text-center space-y-3">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+            <h3 className="text-lg font-bold text-white">No complaints found for filter: {filterStatus}</h3>
+            <p className="text-xs text-slate-400">All local civic issues under your jurisdiction are up to date.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {complaints.map((c) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredComplaints.map((c) => (
               <div
                 key={c.id}
-                className="glass-card rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/30 transition flex flex-col justify-between"
+                onClick={() => setSelectedComplaint(c)}
+                className="glass-card p-5 rounded-3xl border border-slate-800 hover:border-emerald-500/50 cursor-pointer space-y-4 transition-all group shadow-lg"
               >
-                <div>
-                  <div className="relative h-44 bg-slate-900">
-                    <img src={c.original_image_url} alt={c.category_name} className="w-full h-full object-cover" />
-                    <div className="absolute top-3 left-3 bg-slate-950/80 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-cyan-400">
-                      #{c.tracking_id}
-                    </div>
-                    <div className="absolute top-3 right-3">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
-                        c.status === 'RESOLVED' ? 'bg-emerald-500 text-slate-950' :
-                        c.status === 'IN_PROGRESS' ? 'bg-amber-500 text-slate-950' :
-                        c.status === 'REOPENED' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'
-                      }`}>
-                        {c.status}
-                      </span>
-                    </div>
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold text-[11px]">
+                    {c.category_name}
+                  </span>
+                  <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
+                    c.status === 'RESOLVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                    c.status === 'IN_PROGRESS' ? 'bg-amber-500/20 text-amber-400' :
+                    c.status === 'REOPENED' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                  }`}>
+                    {c.status}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="font-mono text-[10px] text-cyan-400 font-bold">#{c.tracking_id}</div>
+                  <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-emerald-400 transition">
+                    {c.description}
+                  </h3>
+                </div>
+
+                <div className="h-36 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 relative">
+                  <img
+                    src={c.original_image_url}
+                    alt={c.category_name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                </div>
+
+                <div className="text-[11px] text-slate-400 space-y-1 pt-2 border-t border-slate-800">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className="truncate">{c.address || `${c.lat}, ${c.lng}`}</span>
                   </div>
-
-                  <div className="p-5 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                        {c.category_name}
-                      </span>
-                      <span className="text-slate-500">{new Date(c.created_at).toLocaleDateString()}</span>
-                    </div>
-
-                    <h3 className="text-sm font-bold text-slate-100 line-clamp-2">{c.description}</h3>
-                    <div className="text-[11px] text-slate-400">📍 {c.address || `${c.lat}, ${c.lng}`}</div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>Citizen: {c.citizen_name || 'Ravi Kumar'}</span>
+                    <span>{new Date(c.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-red-400">{c.priority} Priority</span>
-                  <button
-                    onClick={() => setSelectedComplaint(c)}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold flex items-center gap-1 shadow"
-                  >
-                    Manage Complaint <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+                <button className="w-full py-2.5 rounded-xl bg-slate-900 group-hover:bg-emerald-500 group-hover:text-slate-950 font-extrabold text-xs text-slate-300 flex items-center justify-center gap-1.5 transition">
+                  Review & Action <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
         )}
 
-      </div>
-
-      {/* COMPLAINT DETAIL & ACTION MODAL */}
-      {selectedComplaint && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl">
-            
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-amber-400">Complaint Action Center</span>
-                <h2 className="text-xl font-bold text-white">#{selectedComplaint.tracking_id} - {selectedComplaint.category_name}</h2>
+        {/* SELECTED COMPLAINT DETAIL & ACTION MODAL */}
+        {selectedComplaint && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-2xl">
+              
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <span className="font-mono text-xs font-bold text-cyan-400">#{selectedComplaint.tracking_id}</span>
+                  <h2 className="text-lg font-bold text-white">{selectedComplaint.category_name}</h2>
+                </div>
+                <button
+                  onClick={() => setSelectedComplaint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+                >
+                  ✕
+                </button>
               </div>
-              <button onClick={() => setSelectedComplaint(null)} className="p-2 text-slate-400 hover:text-white">
-                <XCircle className="w-6 h-6" />
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 mb-2">Original Citizen Photo Evidence</h4>
-                <div className="rounded-2xl overflow-hidden border border-slate-800 h-52 bg-slate-950">
+              <p className="text-xs text-slate-300 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                {selectedComplaint.description}
+              </p>
+
+              {/* Photo Evidence */}
+              {selectedComplaint.resolution_image_url ? (
+                <BeforeAfterSlider
+                  beforeImage={selectedComplaint.original_image_url}
+                  afterImage={selectedComplaint.resolution_image_url}
+                />
+              ) : (
+                <div className="h-56 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
                   <img src={selectedComplaint.original_image_url} alt="Evidence" className="w-full h-full object-cover" />
                 </div>
+              )}
+
+              {/* Location Map Preview */}
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-400">Problem Location Pin</div>
+                <div className="text-xs text-slate-300">📍 {selectedComplaint.address || `${selectedComplaint.lat}, ${selectedComplaint.lng}`}</div>
+                <InteractiveMap complaints={[selectedComplaint]} height="h-44" defaultCenter={[selectedComplaint.lat, selectedComplaint.lng]} zoom={16} />
               </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 mb-2">GPS Location Pinpoint</h4>
-                <InteractiveMap complaints={[selectedComplaint]} height="h-52" defaultCenter={[selectedComplaint.lat, selectedComplaint.lng]} zoom={15} />
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
-              <div className="font-bold text-slate-200">Description</div>
-              <p className="text-slate-300">{selectedComplaint.description}</p>
-              <div className="text-[10px] text-slate-400 mt-2">
-                Reported by: {selectedComplaint.citizen_name || 'Citizen'} • Contact: {selectedComplaint.citizen_phone || 'Protected'}
-              </div>
-            </div>
-
-            {/* ACTION WORKFLOW BUTTONS */}
-            <div className="space-y-3 pt-2">
-              <div className="text-xs font-bold text-white uppercase tracking-wider">Update Workflow Status</div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {/* Officer Action Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-800">
                 <button
                   onClick={() => handleStatusUpdate(selectedComplaint.id, 'IN_PROGRESS')}
                   className="p-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center justify-center gap-1.5"
@@ -329,7 +363,7 @@ export default function OfficialDashboard() {
                 </button>
 
                 <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${selectedComplaint.lat},${selectedComplaint.lng}`}
+                  href={getDirectionsUrl(selectedComplaint)}
                   target="_blank"
                   rel="noreferrer"
                   className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs border border-slate-700 flex items-center justify-center gap-1.5"
@@ -340,62 +374,74 @@ export default function OfficialDashboard() {
             </div>
 
           </div>
-        </div>
-      )}
+        )}
 
-      {/* RESOLUTION PHOTO UPLOAD MODAL */}
-      {showResolveModal && selectedComplaint && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <form onSubmit={handleResolveSubmit} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-emerald-400">Resolution Proof Upload</span>
-                <h3 className="text-lg font-bold text-white">Upload "After Fix" Photo Evidence</h3>
+        {/* RESOLUTION PHOTO UPLOAD MODAL */}
+        {showResolveModal && selectedComplaint && (
+          <div className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+            <form onSubmit={handleResolveSubmit} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-emerald-400" /> Upload Resolution Photo (Proof of Work)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowResolveModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
               </div>
-              <button type="button" onClick={() => setShowResolveModal(false)} className="text-slate-400 hover:text-white">
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
 
-            <CameraCapture
-              onImageCaptured={(file, dataUrl) => {
-                setResolutionFile(file);
-                setResolutionDataUrl(dataUrl);
-              }}
-            />
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">Take/Upload After Photo Evidence *</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:text-slate-950 file:font-bold"
+                />
 
-            <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Official Resolution Remarks</label>
-              <textarea
-                rows={3}
-                value={resolutionRemarks}
-                onChange={(e) => setResolutionRemarks(e.target.value)}
-                placeholder="Describe work completed (e.g. Pothole filled with cold asphalt mix and compacted...)"
-                required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
-              />
-            </div>
+                {resolutionPreview && (
+                  <div className="h-40 rounded-xl overflow-hidden border border-emerald-500/30">
+                    <img src={resolutionPreview} alt="Proof preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowResolveModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submittingResolution}
-                className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg"
-              >
-                <Check className="w-4 h-4" /> Confirm & Mark RESOLVED
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Resolution Work Remarks</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Pothole filled with cold asphalt, road level inspected and confirmed by Sachivalayam engineer."
+                  value={resolutionRemarks}
+                  onChange={(e) => setResolutionRemarks(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
 
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResolveModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submittingResolve}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-lg"
+                >
+                  {submittingResolve ? 'Uploading & Resolving...' : 'Confirm Resolution'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

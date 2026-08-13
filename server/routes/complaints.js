@@ -7,11 +7,11 @@ import { reverseGeocode } from '../services/addressService.js';
 
 const router = express.Router();
 
-// Use Memory Storage for 100% Serverless Cloud Compatibility (Zero EROFS Read-Only Disk Errors)
+// Memory Storage for 100% Serverless Cloud Compatibility
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB max
+  limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -66,11 +66,18 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
       return res.status(400).json({ error: 'Photo evidence is required to report a problem' });
     }
 
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
+    let latitude = parseFloat(lat);
+    let longitude = parseFloat(lng);
 
     if (isNaN(latitude) || isNaN(longitude)) {
       return res.status(400).json({ error: 'Valid location coordinates are required' });
+    }
+
+    // Auto-detect and fix flipped coordinates (India Lat is 12-20, Lng is 76-85)
+    if (latitude > 50 && longitude < 50) {
+      const temp = latitude;
+      latitude = longitude;
+      longitude = temp;
     }
 
     // Auto-detect address if custom_address not provided
@@ -146,8 +153,14 @@ router.get('/nearby', async (req, res) => {
       return res.status(400).json({ error: 'lat and lng parameters are required' });
     }
 
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
+    let latitude = parseFloat(lat);
+    let longitude = parseFloat(lng);
+
+    if (latitude > 50 && longitude < 50) {
+      const temp = latitude;
+      latitude = longitude;
+      longitude = temp;
+    }
 
     const activeComplaints = await dbAll(
       `SELECT c.*, u.name as citizen_name, s.name as sachivalayam_name

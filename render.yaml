@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: civicfix-ap
+    env: node
+    region: singapore
+    buildCommand: "cd server && npm install && cd ../client && npm install && npm run build"
+    startCommand: "cd server && node server.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true

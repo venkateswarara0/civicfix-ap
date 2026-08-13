@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Production builds
+dist/
+**/dist/
+
+# Databases & Uploads (runtime data)
+server/civicfix.db
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Environment variables
+.env
+*.env.local
+
+# System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

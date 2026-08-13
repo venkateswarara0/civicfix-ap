@@ -80,7 +80,6 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
       longitude = temp;
     }
 
-    // Auto-detect address if custom_address not provided
     const address = custom_address || 'Gudivada Town, Krishna District, AP - 521301';
 
     // Auto-assign Sachivalayam
@@ -124,7 +123,13 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
       message: 'Complaint submitted successfully',
       tracking_id: trackingId,
       complaint_id: complaintId,
-      assigned_sachivalayam: routingResult
+      assigned_sachivalayam: routingResult,
+      complaint: {
+        id: complaintId,
+        tracking_id: trackingId,
+        category_name: categoryName,
+        description: description.trim()
+      }
     });
   } catch (err) {
     console.error('Complaint creation error:', err);

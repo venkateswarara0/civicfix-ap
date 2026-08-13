@@ -226,11 +226,17 @@ export async function dbGet(sql, params = []) {
 
     let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
 
-    // If no sachivalayam assigned or found yet
-    if (!sach) {
-      // Find nearest registered Sachivalayam dynamically if one has been registered
-      if (store.sachivalayams.length > 0) {
-        sach = store.sachivalayams[0];
+    // Dynamic auto-binding to registered Sachivalayams if unassigned
+    if (!sach && store.sachivalayams.length > 0) {
+      const match = store.sachivalayams.find(s => 
+        (c.address && c.address.includes(s.village)) || 
+        (c.address && c.address.includes(s.mandal)) ||
+        (s.name.includes('Gudivada') && c.address && c.address.includes('Gudivada')) ||
+        (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)
+      ) || store.sachivalayams[0];
+
+      if (match) {
+        sach = match;
         c.sachivalayam_id = sach.id;
       }
     }
@@ -289,8 +295,17 @@ export async function dbAll(sql, params = []) {
     let list = store.complaints.map(c => {
       let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
       if (!sach && store.sachivalayams.length > 0) {
-        sach = store.sachivalayams[0];
-        c.sachivalayam_id = sach.id;
+        const match = store.sachivalayams.find(s => 
+          (c.address && c.address.includes(s.village)) || 
+          (c.address && c.address.includes(s.mandal)) ||
+          (s.name.includes('Gudivada') && c.address && c.address.includes('Gudivada')) ||
+          (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)
+        ) || store.sachivalayams[0];
+
+        if (match) {
+          sach = match;
+          c.sachivalayam_id = sach.id;
+        }
       }
       const citizen = store.users.find(u => u.id == c.citizen_id);
       const official = sach ? (store.users.find(u => u.role === 'OFFICIAL' && u.sachivalayam_id == sach.id) || store.users.find(u => u.role === 'OFFICIAL')) : null;
@@ -310,7 +325,20 @@ export async function dbAll(sql, params = []) {
       list = list.filter(c => c.status === params[0]);
     }
     if (sqlTrim.includes('c.sachivalayam_id = ?')) {
-      list = list.filter(c => c.sachivalayam_id == params[0]);
+      const reqSachId = params[0];
+      const targetSach = store.sachivalayams.find(s => s.id == reqSachId);
+
+      list = list.filter(c => {
+        if (!reqSachId) return true;
+        if (c.sachivalayam_id == reqSachId) return true;
+        if (targetSach) {
+          if (c.address && c.address.includes(targetSach.mandal)) return true;
+          if (c.address && c.address.includes(targetSach.village)) return true;
+          if (targetSach.name.includes('Gudivada') && c.address && c.address.includes('Gudivada')) return true;
+          if (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15 && targetSach.name.includes('Gudivada')) return true;
+        }
+        return false;
+      });
     }
     return list;
   }

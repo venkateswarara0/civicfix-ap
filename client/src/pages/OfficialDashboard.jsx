@@ -11,7 +11,8 @@ import {
   Upload, 
   Play, 
   XCircle, 
-  ChevronRight
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
 export default function OfficialDashboard() {
@@ -20,7 +21,7 @@ export default function OfficialDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [sachivalayamInfo, setSachivalayamInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL'); // Default to ALL
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionRemarks, setResolutionRemarks] = useState('');
@@ -195,7 +196,7 @@ export default function OfficialDashboard() {
               <p className="text-xs text-slate-400">
                 Logged in as <strong className="text-slate-200">{user?.name}</strong> • Jurisdiction:{' '}
                 <span className="text-emerald-400 font-bold">
-                  {sachivalayamInfo ? `${sachivalayamInfo.name} (${sachivalayamInfo.village})` : 'Gudivada Municipal Ward Sachivalayam 05'}
+                  {sachivalayamInfo ? `${sachivalayamInfo.name} (${sachivalayamInfo.village})` : 'Gudivada Municipal Ward Sachivalayam 05 (Gudivada Town)'}
                 </span>
               </p>
             </div>
@@ -233,29 +234,55 @@ export default function OfficialDashboard() {
 
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {['ALL', 'SUBMITTED', 'IN_PROGRESS', 'REOPENED', 'RESOLVED'].map((st) => (
-            <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-4 py-2 rounded-xl font-extrabold text-xs whitespace-nowrap transition ${
-                filterStatus === st
-                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
-                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {st === 'ALL' ? 'All Assigned Issues' : st}
-            </button>
-          ))}
+          {['ALL', 'SUBMITTED', 'IN_PROGRESS', 'REOPENED', 'RESOLVED'].map((st) => {
+            const count = st === 'ALL' 
+              ? complaints.length 
+              : complaints.filter(c => c.status === st).length;
+
+            return (
+              <button
+                key={st}
+                onClick={() => setFilterStatus(st)}
+                className={`px-4 py-2 rounded-xl font-extrabold text-xs whitespace-nowrap flex items-center gap-1.5 transition ${
+                  filterStatus === st
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>{st === 'ALL' ? 'All Assigned Issues' : st}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                  filterStatus === st ? 'bg-slate-950 text-emerald-400 font-mono' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Complaints Grid & Drawer View */}
         {loading ? (
           <div className="text-center py-12 text-slate-500 text-xs">Loading assigned Sachivalayam complaints...</div>
         ) : filteredComplaints.length === 0 ? (
-          <div className="glass-card p-12 rounded-3xl border border-slate-800 text-center space-y-3">
+          <div className="glass-card p-12 rounded-3xl border border-slate-800 text-center space-y-4">
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
             <h3 className="text-lg font-bold text-white">No complaints found for filter: {filterStatus}</h3>
-            <p className="text-xs text-slate-400">All local civic issues under your Sachivalayam jurisdiction are up to date.</p>
+
+            {complaints.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs text-amber-400">
+                  You currently have <strong>{complaints.length} complaint(s)</strong> assigned to your Sachivalayam under other status filters (e.g. SUBMITTED).
+                </p>
+                <button
+                  onClick={() => setFilterStatus('ALL')}
+                  className="px-4 py-2 bg-emerald-500 text-slate-950 font-extrabold text-xs rounded-xl hover:bg-emerald-400 transition"
+                >
+                  View All {complaints.length} Assigned Issues
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">All local civic issues under your Sachivalayam jurisdiction are up to date.</p>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

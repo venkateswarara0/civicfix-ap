@@ -22,33 +22,39 @@ export async function initDb() {
 
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  // 1. Seed Sachivalayams in Andhra Pradesh
+  // 1. Seed Sachivalayams in Andhra Pradesh (including Gudivada, Vijayawada, Visakhapatnam, Guntur, Tirupati)
   store.sachivalayams = [
     { id: 1, name: 'Patamata Ward Sachivalayam 14', code: 'AP-VJA-PAT-014', district: 'NTR District', mandal: 'Vijayawada Urban', village: 'Patamata', lat: 16.4975, lng: 80.6552, min_lat: 16.480, max_lat: 16.510, min_lng: 80.640, max_lng: 80.670, official_name: 'K. Venkatesh (Ward Secretary)', contact_phone: '+91 98480 12345', created_at: new Date().toISOString() },
     { id: 2, name: 'Suryaraopet Grama Sachivalayam 08', code: 'AP-VJA-SUR-008', district: 'NTR District', mandal: 'Vijayawada Central', village: 'Suryaraopet', lat: 16.5105, lng: 80.6288, min_lat: 16.500, max_lat: 16.525, min_lng: 80.615, max_lng: 80.640, official_name: 'M. Lakshmi (Civic Welfare Officer)', contact_phone: '+91 98480 23456', created_at: new Date().toISOString() },
     { id: 3, name: 'Gajuwaka Ward Sachivalayam 03', code: 'AP-VSK-GAJ-003', district: 'Visakhapatnam', mandal: 'Gajuwaka', village: 'Gajuwaka Colony', lat: 17.6905, lng: 83.2185, min_lat: 17.670, max_lat: 17.710, min_lng: 83.190, max_lng: 83.240, official_name: 'R. Ramesh (Sanitation Secretary)', contact_phone: '+91 98480 34567', created_at: new Date().toISOString() },
     { id: 4, name: 'Brodipet Grama Sachivalayam 05', code: 'AP-GNT-BRO-005', district: 'Guntur', mandal: 'Guntur Urban', village: 'Brodipet', lat: 16.3067, lng: 80.4365, min_lat: 16.290, max_lat: 16.320, min_lng: 80.420, max_lng: 80.450, official_name: 'S. Nageswara Rao', contact_phone: '+91 98480 45678', created_at: new Date().toISOString() },
-    { id: 5, name: 'Tirupati Town Ward Sachivalayam 02', code: 'AP-TPT-TWN-002', district: 'Tirupati', mandal: 'Tirupati Urban', village: 'KT Road', lat: 13.6288, lng: 79.4192, min_lat: 13.610, max_lat: 13.645, min_lng: 79.400, max_lng: 79.435, official_name: 'P. Anand Reddy', contact_phone: '+91 98480 56789', created_at: new Date().toISOString() }
+    { id: 5, name: 'Tirupati Town Ward Sachivalayam 02', code: 'AP-TPT-TWN-002', district: 'Tirupati', mandal: 'Tirupati Urban', village: 'KT Road', lat: 13.6288, lng: 79.4192, min_lat: 13.610, max_lat: 13.645, min_lng: 79.400, max_lng: 79.435, official_name: 'P. Anand Reddy', contact_phone: '+91 98480 56789', created_at: new Date().toISOString() },
+    
+    // Gudivada Sachivalayams (Krishna District)
+    { id: 6, name: 'Gudivada Municipal Ward Sachivalayam 05', code: 'AP-KRI-GDV-005', district: 'Krishna District', mandal: 'Gudivada Mandal', village: 'Bommuluru / Gudivada Town', lat: 16.4181, lng: 81.0170, min_lat: 16.350, max_lat: 16.460, min_lng: 80.950, max_lng: 81.070, official_name: 'P. Srinivas (Ward Secretary, Gudivada)', contact_phone: '+91 98480 67890', created_at: new Date().toISOString() },
+    { id: 7, name: 'Gudivada Rural Grama Sachivalayam 02', code: 'AP-KRI-GDV-002', district: 'Krishna District', mandal: 'Gudivada Mandal', village: 'Gudivada Rural', lat: 16.4420, lng: 81.0020, min_lat: 16.420, max_lat: 16.480, min_lng: 80.980, max_lng: 81.050, official_name: 'Ch. Prasad (Gram Secretary)', contact_phone: '+91 98480 78901', created_at: new Date().toISOString() }
   ];
-  store.sachivalayamSeq = 6;
+  store.sachivalayamSeq = 8;
 
   // 2. Seed Users
   store.users = [
     { id: 1, name: 'Ravi Kumar (Demo Citizen)', email: 'citizen@civicfix.in', password_hash: passwordHash, role: 'CITIZEN', phone: '+91 99887 76655', sachivalayam_id: null, created_at: new Date().toISOString() },
     { id: 2, name: 'K. Venkatesh (Official)', email: 'official.patamata@civicfix.in', password_hash: passwordHash, role: 'OFFICIAL', phone: '+91 98480 12345', sachivalayam_id: 1, created_at: new Date().toISOString() },
     { id: 3, name: 'M. Lakshmi (Official)', email: 'official.suryaraopet@civicfix.in', password_hash: passwordHash, role: 'OFFICIAL', phone: '+91 98480 23456', sachivalayam_id: 2, created_at: new Date().toISOString() },
-    { id: 4, name: 'Admin Officer (AP Civic Portal)', email: 'admin@civicfix.in', password_hash: passwordHash, role: 'ADMIN', phone: '+91 90000 00000', sachivalayam_id: null, created_at: new Date().toISOString() }
+    { id: 4, name: 'Admin Officer (AP Civic Portal)', email: 'admin@civicfix.in', password_hash: passwordHash, role: 'ADMIN', phone: '+91 90000 00000', sachivalayam_id: null, created_at: new Date().toISOString() },
+    { id: 5, name: 'P. Srinivas (Gudivada Official)', email: 'official.gudivada@civicfix.in', password_hash: passwordHash, role: 'OFFICIAL', phone: '+91 98480 67890', sachivalayam_id: 6, created_at: new Date().toISOString() }
   ];
-  store.userSeq = 5;
+  store.userSeq = 6;
 
   // 3. Seed Sample Complaints
   store.complaints = [
     { id: 1, tracking_id: 'CF-2026-08101', citizen_id: 1, category_id: 'pothole', category_name: 'Pothole / Road Damage', description: 'Deep hazardous pothole on MG Road near Benz Circle, creating severe risk for two-wheelers during monsoon rains.', original_image_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&q=80', resolution_image_url: 'https://images.unsplash.com/photo-1584463688353-27c19664f3ce?w=800&q=80', lat: 16.4982, lng: 80.6548, location_accuracy: 4.2, address: 'Near Benz Circle, MG Road, Patamata, Vijayawada, NTR District, AP - 520010', sachivalayam_id: 1, assigned_official_id: 2, priority: 'HIGH', status: 'RESOLVED', resolution_remarks: 'Pothole filled with cold asphalt mix, compacted with roller, and level inspected by Ward Engineering Officer.', upvotes_count: 3, created_at: '2026-08-10 09:30:00', updated_at: '2026-08-11 14:15:00', resolved_at: '2026-08-11 14:15:00', reopened_at: null },
     { id: 2, tracking_id: 'CF-2026-08102', citizen_id: 1, category_id: 'garbage', category_name: 'Garbage Dumping', description: 'Overflowing commercial waste bin spilling onto sidewalk near Patamata High School, causing bad odor.', original_image_url: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=800&q=80', resolution_image_url: null, lat: 16.4968, lng: 80.6560, location_accuracy: 5.0, address: 'Opposite High School, Main Road, Patamata, Vijayawada, NTR District, AP', sachivalayam_id: 1, assigned_official_id: 2, priority: 'MEDIUM', status: 'IN_PROGRESS', resolution_remarks: null, upvotes_count: 1, created_at: '2026-08-12 11:00:00', updated_at: '2026-08-12 11:00:00', resolved_at: null, reopened_at: null },
     { id: 3, tracking_id: 'CF-2026-08103', citizen_id: 1, category_id: 'open_manhole', category_name: 'Open Manhole / Safety Hazard', description: 'Concrete manhole cover missing on residential street. Extremely dangerous at night!', original_image_url: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=800&q=80', resolution_image_url: null, lat: 16.5112, lng: 80.6295, location_accuracy: 3.5, address: 'Street 4, Suryaraopet, Vijayawada, NTR District, AP - 520002', sachivalayam_id: 2, assigned_official_id: 3, priority: 'CRITICAL', status: 'ASSIGNED', resolution_remarks: null, upvotes_count: 5, created_at: '2026-08-13 08:20:00', updated_at: '2026-08-13 08:20:00', resolved_at: null, reopened_at: null },
-    { id: 4, tracking_id: 'CF-2026-08104', citizen_id: 1, category_id: 'streetlight', category_name: 'Broken Street Light', description: 'Three consecutive LED streetlights not functioning on Gajuwaka Main Road junction.', original_image_url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=800&q=80', resolution_image_url: 'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=800&q=80', lat: 17.6912, lng: 83.2190, location_accuracy: 6.0, address: 'Junction 2, Gajuwaka, Visakhapatnam, AP - 530026', sachivalayam_id: 3, assigned_official_id: null, priority: 'LOW', status: 'REOPENED', resolution_remarks: 'Replaced light bulbs', upvotes_count: 2, created_at: '2026-08-08 18:40:00', updated_at: '2026-08-11 10:00:00', resolved_at: null, reopened_at: '2026-08-11 10:00:00' }
+    { id: 4, tracking_id: 'CF-2026-08104', citizen_id: 1, category_id: 'streetlight', category_name: 'Broken Street Light', description: 'Three consecutive LED streetlights not functioning on Gajuwaka Main Road junction.', original_image_url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=800&q=80', resolution_image_url: 'https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=800&q=80', lat: 17.6912, lng: 83.2190, location_accuracy: 6.0, address: 'Junction 2, Gajuwaka, Visakhapatnam, AP - 530026', sachivalayam_id: 3, assigned_official_id: null, priority: 'LOW', status: 'REOPENED', resolution_remarks: 'Replaced light bulbs', upvotes_count: 2, created_at: '2026-08-08 18:40:00', updated_at: '2026-08-11 10:00:00', resolved_at: null, reopened_at: '2026-08-11 10:00:00' },
+    { id: 5, tracking_id: 'CF-2026-08105', citizen_id: 1, category_id: 'pothole', category_name: 'Pothole / Road Damage', description: 'Cracked asphalt and pothole on Eluru Road near Bommuluru junction, Gudivada.', original_image_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&q=80', resolution_image_url: null, lat: 16.4181, lng: 81.0170, location_accuracy: 4.0, address: 'Bommuluru, Gudivada, Krishna District, AP - 521301', sachivalayam_id: 6, assigned_official_id: 5, priority: 'HIGH', status: 'SUBMITTED', resolution_remarks: null, upvotes_count: 2, created_at: '2026-08-13 19:10:00', updated_at: '2026-08-13 19:10:00', resolved_at: null, reopened_at: null }
   ];
-  store.complaintSeq = 5;
+  store.complaintSeq = 6;
 
   store.history = [
     { id: 1, complaint_id: 1, old_status: null, new_status: 'SUBMITTED', changed_by: 1, changed_by_name: 'Ravi Kumar (Citizen)', remarks: 'Complaint submitted with GPS evidence.', timestamp: '2026-08-10 09:30:00' },
@@ -57,7 +63,7 @@ export async function initDb() {
   store.historySeq = 3;
 
   store.initialized = true;
-  console.log('✅ In-Memory Pure JS Database Engine initialized and seeded.');
+  console.log('✅ In-Memory Pure JS Database Engine initialized with Gudivada Sachivalayams.');
 }
 
 // Async Database Runners
@@ -237,15 +243,15 @@ export async function dbGet(sql, params = []) {
       citizen_name: citizen?.name || 'Ravi Kumar',
       citizen_phone: citizen?.phone || '+91 99887 76655',
       citizen_email: citizen?.email || 'citizen@civicfix.in',
-      sachivalayam_name: sach?.name || 'Patamata Ward Sachivalayam 14',
-      sachivalayam_code: sach?.code || 'AP-VJA-PAT-014',
-      district: sach?.district || 'NTR District',
-      mandal: sach?.mandal || 'Vijayawada Urban',
-      village: sach?.village || 'Patamata',
-      sachivalayam_contact_person: sach?.official_name || 'K. Venkatesh',
-      sachivalayam_phone: sach?.contact_phone || '+91 98480 12345',
-      official_name: official?.name || 'K. Venkatesh',
-      official_phone: official?.phone || '+91 98480 12345'
+      sachivalayam_name: sach?.name || 'Gudivada Municipal Ward Sachivalayam 05',
+      sachivalayam_code: sach?.code || 'AP-KRI-GDV-005',
+      district: sach?.district || 'Krishna District',
+      mandal: sach?.mandal || 'Gudivada Mandal',
+      village: sach?.village || 'Gudivada',
+      sachivalayam_contact_person: sach?.official_name || 'P. Srinivas',
+      sachivalayam_phone: sach?.contact_phone || '+91 98480 67890',
+      official_name: official?.name || 'P. Srinivas',
+      official_phone: official?.phone || '+91 98480 67890'
     };
   }
   if (sqlTrim.includes('COUNT(*) as count FROM users')) {
@@ -287,8 +293,8 @@ export async function dbAll(sql, params = []) {
         ...c,
         citizen_name: citizen?.name || 'Ravi Kumar',
         citizen_phone: citizen?.phone || '+91 99887 76655',
-        sachivalayam_name: sach?.name || 'Patamata Ward Sachivalayam 14',
-        official_name: official?.name || 'K. Venkatesh'
+        sachivalayam_name: sach?.name || 'Gudivada Ward Sachivalayam 05',
+        official_name: official?.name || 'P. Srinivas'
       };
     });
 

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import InteractiveMap from '../components/InteractiveMap';
 import { 
   ShieldAlert, 
   User, 
@@ -27,11 +26,6 @@ export default function AuthPage() {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('CITIZEN'); // CITIZEN or OFFICIAL
   
-  // Sachivalayam mode for Officials: 'EXISTING' or 'NEW'
-  const [sachivalayamMode, setSachivalayamMode] = useState('NEW');
-  const [sachivalayamId, setSachivalayamId] = useState('');
-  const [sachivalayams, setSachivalayams] = useState([]);
-  
   // Custom Sachivalayam input for ANY AP area
   const [customSachName, setCustomSachName] = useState('');
   const [customDistrict, setCustomDistrict] = useState('Krishna District');
@@ -43,26 +37,6 @@ export default function AuthPage() {
 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchSachivalayams();
-  }, []);
-
-  const fetchSachivalayams = async () => {
-    try {
-      const res = await fetch('/api/sachivalayams');
-      if (res.ok) {
-        const data = await res.json();
-        setSachivalayams(data.sachivalayams || []);
-        if (data.sachivalayams && data.sachivalayams.length > 0) {
-          const gudivada = data.sachivalayams.find(s => s.id === 6);
-          setSachivalayamId(gudivada ? '6' : String(data.sachivalayams[0].id));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load Sachivalayams list:', err);
-    }
-  };
 
   const handleDetectGps = () => {
     if (!navigator.geolocation) {
@@ -79,7 +53,6 @@ export default function AuthPage() {
       (err) => {
         console.error('GPS Detection failed:', err);
         setDetectingGps(false);
-        // Default to Gudivada center
         setSachLat(16.442);
         setSachLng(81.002);
       },
@@ -102,9 +75,8 @@ export default function AuthPage() {
         password,
         phone,
         role,
-        sachivalayam_id: (role === 'OFFICIAL' && sachivalayamMode === 'EXISTING') ? sachivalayamId : null,
-        custom_sachivalayam: (role === 'OFFICIAL' && sachivalayamMode === 'NEW') ? {
-          sachivalayam_name: customSachName || `${customVillage} Ward/Grama Sachivalayam`,
+        custom_sachivalayam: role === 'OFFICIAL' ? {
+          sachivalayam_name: customSachName || `${customVillage} Ward/Grama Sachivalayam 05`,
           district: customDistrict,
           mandal: customMandal,
           village: customVillage,
@@ -214,126 +186,87 @@ export default function AuthPage() {
           {/* Sachivalayam Jurisdiction Form for Officials */}
           {isRegister && role === 'OFFICIAL' && (
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4" /> Sachivalayam Jurisdiction & GPS Location *
-                </label>
+              <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4" /> Sachivalayam Jurisdiction & Office GPS Location *
+              </label>
 
-                <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setSachivalayamMode('NEW')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      sachivalayamMode === 'NEW' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-                    }`}
-                  >
-                    Enter My Area
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSachivalayamMode('EXISTING')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      sachivalayamMode === 'EXISTING' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-                    }`}
-                  >
-                    Select List
-                  </button>
+              <div className="space-y-2.5">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-0.5">District (AP) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Krishna District, NTR District, Visakhapatnam..."
+                    value={customDistrict}
+                    onChange={(e) => setCustomDistrict(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Mandal / Municipality *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Gudivada, Gajuwaka..."
+                      value={customMandal}
+                      onChange={(e) => setCustomMandal(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Village / Town Ward *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Bommuluru, Ward 05..."
+                      value={customVillage}
+                      onChange={(e) => setCustomVillage(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Sachivalayam Name & Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Gudivada Municipal Ward Sachivalayam 05"
+                    value={customSachName}
+                    onChange={(e) => setCustomSachName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Sachivalayam Office GPS Coordinates Capture */}
+                <div className="pt-2 space-y-1.5 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" /> Sachivalayam Office GPS Location
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleDetectGps}
+                      disabled={detectingGps}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[10px] font-bold flex items-center gap-1 border border-amber-500/30"
+                    >
+                      <Navigation className="w-3 h-3" /> {detectingGps ? 'Detecting...' : 'Detect Current GPS'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
+                      <span className="text-slate-500">Lat:</span> {sachLat.toFixed(5)}
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
+                      <span className="text-slate-500">Lng:</span> {sachLng.toFixed(5)}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {sachivalayamMode === 'NEW' ? (
-                <div className="space-y-2.5 pt-1">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-0.5">District (AP) *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Krishna District, NTR District, Visakhapatnam..."
-                      value={customDistrict}
-                      onChange={(e) => setCustomDistrict(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Mandal / Municipality *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Gudivada, Gajuwaka..."
-                        value={customMandal}
-                        onChange={(e) => setCustomMandal(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Village / Town Ward *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Bommuluru, Ward 05..."
-                        value={customVillage}
-                        onChange={(e) => setCustomVillage(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Sachivalayam Name & Code *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Gudivada Municipal Ward Sachivalayam 05"
-                      value={customSachName}
-                      onChange={(e) => setCustomSachName(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  {/* Sachivalayam Office GPS Coordinates Capture */}
-                  <div className="pt-2 space-y-1.5 border-t border-slate-800">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5" /> Sachivalayam GPS Office Building Location
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleDetectGps}
-                        disabled={detectingGps}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[10px] font-bold flex items-center gap-1 border border-amber-500/30"
-                      >
-                        <Navigation className="w-3 h-3" /> {detectingGps ? 'Detecting...' : 'Detect Current GPS'}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                      <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
-                        <span className="text-slate-500">Lat:</span> {sachLat.toFixed(5)}
-                      </div>
-                      <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
-                        <span className="text-slate-500">Lng:</span> {sachLng.toFixed(5)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1 pt-1">
-                  <select
-                    value={sachivalayamId}
-                    onChange={(e) => setSachivalayamId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-400"
-                  >
-                    {sachivalayams.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.village}, {s.district})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <p className="text-[10px] text-slate-400 leading-tight">
                 Citizens reporting nearby civic problems will automatically be assigned to your Sachivalayam based on exact GPS distance.

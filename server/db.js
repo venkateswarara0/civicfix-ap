@@ -63,7 +63,7 @@ export async function initDb() {
   store.historySeq = 3;
 
   store.initialized = true;
-  console.log('✅ In-Memory Pure JS Database Engine initialized with Gudivada Sachivalayams.');
+  console.log('✅ In-Memory Pure JS Database Engine initialized.');
 }
 
 // Async Database Runners
@@ -232,9 +232,13 @@ export async function dbGet(sql, params = []) {
   if (sqlTrim.includes('FROM sachivalayams WHERE id = ?')) {
     return store.sachivalayams.find(s => s.id == params[0]) || null;
   }
-  if (sqlTrim.includes('FROM complaints WHERE id = ?')) {
-    const c = store.complaints.find(comp => comp.id == params[0] || comp.tracking_id == params[0]);
+
+  // ROBUST COMPLAINT BY ID OR TRACKING ID LOOKUP
+  if (sqlTrim.includes('FROM complaints') && (sqlTrim.includes('id = ?') || sqlTrim.includes('c.id = ?') || sqlTrim.includes('tracking_id = ?'))) {
+    const target = params[0];
+    const c = store.complaints.find(comp => comp.id == target || comp.tracking_id == target);
     if (!c) return null;
+
     const citizen = store.users.find(u => u.id == c.citizen_id);
     const sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
     const official = store.users.find(u => u.id == c.assigned_official_id);
@@ -254,6 +258,7 @@ export async function dbGet(sql, params = []) {
       official_phone: official?.phone || '+91 98480 67890'
     };
   }
+
   if (sqlTrim.includes('COUNT(*) as count FROM users')) {
     return { count: store.users.length };
   }

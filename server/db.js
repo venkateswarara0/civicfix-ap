@@ -87,7 +87,7 @@ export async function dbRun(sql, params = []) {
     return { lastID: user.id, changes: 1 };
   }
 
-  // Sachivalayams INSERT
+  // Sachivalyams INSERT
   if (sqlTrim.startsWith('INSERT INTO sachivalayams')) {
     const sach = {
       id: store.sachivalayamSeq++,
@@ -125,8 +125,8 @@ export async function dbRun(sql, params = []) {
       lng: parseFloat(params[8]),
       location_accuracy: parseFloat(params[9]) || 5.0,
       address: params[10] || 'Andhra Pradesh',
-      sachivalayam_id: params[11] || 1,
-      assigned_official_id: params[12] || 2,
+      sachivalayam_id: params[11] || 6,
+      assigned_official_id: params[12] || 5,
       priority: params[13] || 'MEDIUM',
       status: params[14] || 'SUBMITTED',
       resolution_remarks: params[15] || null,
@@ -239,9 +239,17 @@ export async function dbGet(sql, params = []) {
     const c = store.complaints.find(comp => comp.id == target || comp.tracking_id == target);
     if (!c) return null;
 
+    let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
+
+    // If location is in Gudivada or address mentions Gudivada, ensure Sachivalayam is Gudivada Municipal Ward Sachivalayam 05
+    if (!sach || (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
+      sach = store.sachivalayams.find(s => s.id === 6) || sach;
+      c.sachivalayam_id = 6;
+      c.assigned_official_id = 5;
+    }
+
     const citizen = store.users.find(u => u.id == c.citizen_id);
-    const sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
-    const official = store.users.find(u => u.id == c.assigned_official_id);
+    const official = store.users.find(u => u.id == (c.assigned_official_id || 5));
     return {
       ...c,
       citizen_name: citizen?.name || 'Ravi Kumar',
@@ -252,7 +260,7 @@ export async function dbGet(sql, params = []) {
       district: sach?.district || 'Krishna District',
       mandal: sach?.mandal || 'Gudivada Mandal',
       village: sach?.village || 'Gudivada',
-      sachivalayam_contact_person: sach?.official_name || 'P. Srinivas',
+      sachivalayam_contact_person: sach?.official_name || 'P. Srinivas (Ward Secretary, Gudivada)',
       sachivalayam_phone: sach?.contact_phone || '+91 98480 67890',
       official_name: official?.name || 'P. Srinivas',
       official_phone: official?.phone || '+91 98480 67890'
@@ -291,9 +299,13 @@ export async function dbAll(sql, params = []) {
   }
   if (sqlTrim.includes('FROM complaints')) {
     let list = store.complaints.map(c => {
+      let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
+      if (!sach || (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
+        sach = store.sachivalayams.find(s => s.id === 6) || sach;
+        c.sachivalayam_id = 6;
+      }
       const citizen = store.users.find(u => u.id == c.citizen_id);
-      const sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
-      const official = store.users.find(u => u.id == c.assigned_official_id);
+      const official = store.users.find(u => u.id == (c.assigned_official_id || 5));
       return {
         ...c,
         citizen_name: citizen?.name || 'Ravi Kumar',

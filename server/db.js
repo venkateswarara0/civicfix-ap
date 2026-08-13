@@ -1,11 +1,14 @@
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.join(__dirname, 'civicfix.db');
+
+// On Vercel, use /tmp folder for writable SQLite DB
+const dbPath = process.env.VERCEL ? path.join('/tmp', 'civicfix.db') : path.join(__dirname, 'civicfix.db');
 
 const db = new sqlite3.Database(dbPath);
 
@@ -38,115 +41,120 @@ export function dbAll(sql, params = []) {
 }
 
 export async function initDb() {
-  db.serialize(async () => {
-    // 1. Users table
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'CITIZEN', -- CITIZEN, OFFICIAL, ADMIN
-        phone TEXT,
-        sachivalayam_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+  return new Promise((resolve, reject) => {
+    db.serialize(async () => {
+      try {
+        // 1. Users table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'CITIZEN',
+            phone TEXT,
+            sachivalayam_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
 
-    // 2. Sachivalayams table (Grama / Ward Sachivalayam)
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS sachivalayams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        code TEXT UNIQUE NOT NULL,
-        district TEXT NOT NULL,
-        mandal TEXT NOT NULL,
-        village TEXT NOT NULL,
-        lat REAL NOT NULL,
-        lng REAL NOT NULL,
-        min_lat REAL,
-        max_lat REAL,
-        min_lng REAL,
-        max_lng REAL,
-        official_name TEXT,
-        contact_phone TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+        // 2. Sachivalayams table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS sachivalayams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            code TEXT UNIQUE NOT NULL,
+            district TEXT NOT NULL,
+            mandal TEXT NOT NULL,
+            village TEXT NOT NULL,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            min_lat REAL,
+            max_lat REAL,
+            min_lng REAL,
+            max_lng REAL,
+            official_name TEXT,
+            contact_phone TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
 
-    // 3. Complaints table
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS complaints (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tracking_id TEXT UNIQUE NOT NULL,
-        citizen_id INTEGER NOT NULL,
-        category_id TEXT NOT NULL,
-        category_name TEXT NOT NULL,
-        description TEXT NOT NULL,
-        original_image_url TEXT NOT NULL,
-        resolution_image_url TEXT,
-        lat REAL NOT NULL,
-        lng REAL NOT NULL,
-        location_accuracy REAL,
-        address TEXT,
-        sachivalayam_id INTEGER,
-        assigned_official_id INTEGER,
-        priority TEXT DEFAULT 'MEDIUM', -- LOW, MEDIUM, HIGH, CRITICAL
-        status TEXT DEFAULT 'SUBMITTED', -- SUBMITTED, UNDER_REVIEW, ASSIGNED, IN_PROGRESS, RESOLVED, REOPENED, REJECTED
-        resolution_remarks TEXT,
-        upvotes_count INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        resolved_at DATETIME,
-        reopened_at DATETIME,
-        FOREIGN KEY (citizen_id) REFERENCES users(id),
-        FOREIGN KEY (sachivalayam_id) REFERENCES sachivalayams(id)
-      )
-    `);
+        // 3. Complaints table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS complaints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_id TEXT UNIQUE NOT NULL,
+            citizen_id INTEGER NOT NULL,
+            category_id TEXT NOT NULL,
+            category_name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            original_image_url TEXT NOT NULL,
+            resolution_image_url TEXT,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            location_accuracy REAL,
+            address TEXT,
+            sachivalayam_id INTEGER,
+            assigned_official_id INTEGER,
+            priority TEXT DEFAULT 'MEDIUM',
+            status TEXT DEFAULT 'SUBMITTED',
+            resolution_remarks TEXT,
+            upvotes_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATETIME,
+            reopened_at DATETIME,
+            FOREIGN KEY (citizen_id) REFERENCES users(id),
+            FOREIGN KEY (sachivalayam_id) REFERENCES sachivalayams(id)
+          )
+        `);
 
-    // 4. Complaint status history table
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS complaint_status_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id INTEGER NOT NULL,
-        old_status TEXT,
-        new_status TEXT NOT NULL,
-        changed_by INTEGER,
-        changed_by_name TEXT,
-        remarks TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (complaint_id) REFERENCES complaints(id)
-      )
-    `);
+        // 4. Complaint status history table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS complaint_status_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER NOT NULL,
+            old_status TEXT,
+            new_status TEXT NOT NULL,
+            changed_by INTEGER,
+            changed_by_name TEXT,
+            remarks TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (complaint_id) REFERENCES complaints(id)
+          )
+        `);
 
-    // 5. Notifications table
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        complaint_id INTEGER NOT NULL,
-        message TEXT NOT NULL,
-        is_read INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      )
-    `);
+        // 5. Notifications table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            complaint_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          )
+        `);
 
-    // 6. Upvotes table
-    await dbRun(`
-      CREATE TABLE IF NOT EXISTS complaint_upvotes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        complaint_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(complaint_id, user_id)
-      )
-    `);
+        // 6. Upvotes table
+        await dbRun(`
+          CREATE TABLE IF NOT EXISTS complaint_upvotes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(complaint_id, user_id)
+          )
+        `);
 
-    console.log('✅ SQLite Database Tables initialized.');
-
-    // Seed database if empty
-    await seedDatabase();
+        // Seed database if empty
+        await seedDatabase();
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
   });
 }
 
@@ -156,11 +164,9 @@ async function seedDatabase() {
     return; // Already seeded
   }
 
-  console.log('🌱 Seeding DEMO DATA for AP Sachivalayams, Users, and Complaints...');
-
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  // 1. Seed Sachivalayams in Andhra Pradesh
+  // 1. Seed Sachivalayams
   const sachivalayams = [
     {
       name: 'Patamata Ward Sachivalayam 14',
@@ -247,32 +253,28 @@ async function seedDatabase() {
     );
   }
 
-  // 2. Seed Users (Citizen, Officials, Admin)
-  // Citizen
+  // 2. Seed Users
   await dbRun(
     `INSERT INTO users (name, email, password_hash, role, phone) VALUES (?, ?, ?, ?, ?)`,
     ['Ravi Kumar (Demo Citizen)', 'citizen@civicfix.in', passwordHash, 'CITIZEN', '+91 99887 76655']
   );
 
-  // Official Patamata
   await dbRun(
     `INSERT INTO users (name, email, password_hash, role, phone, sachivalayam_id) VALUES (?, ?, ?, ?, ?, ?)`,
     ['K. Venkatesh (Official)', 'official.patamata@civicfix.in', passwordHash, 'OFFICIAL', '+91 98480 12345', 1]
   );
 
-  // Official Suryaraopet
   await dbRun(
     `INSERT INTO users (name, email, password_hash, role, phone, sachivalayam_id) VALUES (?, ?, ?, ?, ?, ?)`,
     ['M. Lakshmi (Official)', 'official.suryaraopet@civicfix.in', passwordHash, 'OFFICIAL', '+91 98480 23456', 2]
   );
 
-  // Admin
   await dbRun(
     `INSERT INTO users (name, email, password_hash, role, phone) VALUES (?, ?, ?, ?, ?)`,
     ['Admin Officer (AP Civic Portal)', 'admin@civicfix.in', passwordHash, 'ADMIN', '+91 90000 00000']
   );
 
-  // 3. Seed Sample Complaints with realistic AP coordinates & Before/After photos
+  // 3. Seed Sample Complaints
   const sampleComplaints = [
     {
       tracking_id: 'CF-2026-08101',
@@ -384,7 +386,6 @@ async function seedDatabase() {
       ]
     );
 
-    // Initial status history log
     await dbRun(
       `INSERT INTO complaint_status_history (complaint_id, old_status, new_status, changed_by_name, remarks, timestamp)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -405,8 +406,6 @@ async function seedDatabase() {
       );
     }
   }
-
-  console.log('✨ Demo data successfully seeded!');
 }
 
 export default db;

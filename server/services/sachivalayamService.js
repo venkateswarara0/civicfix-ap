@@ -16,17 +16,30 @@ export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Finds the responsible Sachivalayam for given GPS coordinates.
+ * Universal Nearest-Neighbor Sachivalayam Routing Engine
  * Priority:
- * 1. Jurisdiction bounding box geofence match (min_lat <= lat <= max_lat AND min_lng <= lng <= max_lng)
- * 2. Nearest registered Sachivalayam distance
- * 3. Town/Mandal dynamic local authority assignment for AP locations
+ * 1. Exact Jurisdiction bounding box geofence match
+ * 2. Nearest registered Sachivalayam by Haversine Distance
  */
 export async function findResponsibleSachivalayam(latitude, longitude) {
-  const lat = parseFloat(latitude);
-  const lng = parseFloat(longitude);
+  let lat = parseFloat(latitude);
+  let lng = parseFloat(longitude);
 
   if (isNaN(lat) || isNaN(lng)) {
+    lat = 16.4181;
+    lng = 81.0170;
+  }
+
+  // Auto-correct if lat and lng are flipped (lat > 50° is Longitude in India!)
+  if (lat > 50 && lng < 50) {
+    const temp = lat;
+    lat = lng;
+    lng = temp;
+  }
+
+  const sachivalayams = await dbAll('SELECT * FROM sachivalayams');
+
+  if (!sachivalayams || sachivalayams.length === 0) {
     return {
       sachivalayam_id: 6,
       sachivalayam_name: 'Gudivada Municipal Ward Sachivalayam 05',
@@ -37,8 +50,6 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
       jurisdiction: 'Gudivada, Krishna District'
     };
   }
-
-  const sachivalayams = await dbAll('SELECT * FROM sachivalayams');
 
   // 1. Try Geofence / Bounding Box Match
   for (const s of sachivalayams) {
@@ -68,7 +79,7 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
     }
   }
 
-  // 2. Nearest registered Sachivalayam by Haversine Distance
+  // 2. Pure Nearest Registered Sachivalayam by Haversine Distance
   let nearest = null;
   let minDistance = Infinity;
 
@@ -80,7 +91,7 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
     }
   }
 
-  if (nearest && minDistance <= 15) {
+  if (nearest) {
     const official = await dbGet(
       "SELECT id FROM users WHERE role = 'OFFICIAL' AND sachivalayam_id = ? LIMIT 1",
       [nearest.id]
@@ -90,37 +101,22 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
       sachivalayam_id: nearest.id,
       sachivalayam_name: nearest.name,
       sachivalayam_code: nearest.code,
-      assigned_official_id: official ? official.id : null,
+      assigned_official_id: official ? official.id : 5,
       distance_km: parseFloat(minDistance.toFixed(2)),
       assignment_method: 'NEAREST_DISTANCE',
       jurisdiction: `${nearest.village}, ${nearest.mandal}, ${nearest.district}`
     };
   }
 
-  // 3. Special AP Regional Geofence Check for Gudivada (Lat ~16.35 - 16.48, Lng ~80.95 - 81.10)
-  if (lat >= 16.30 && lat <= 16.55 && lng >= 80.90 && lng <= 81.15) {
-    const gudivadaSach = sachivalayams.find(s => s.id === 6) || nearest;
-    const dist = calculateHaversineDistance(lat, lng, 16.4181, 81.0170);
-
-    return {
-      sachivalayam_id: gudivadaSach.id,
-      sachivalayam_name: 'Gudivada Municipal Ward Sachivalayam 05',
-      sachivalayam_code: 'AP-KRI-GDV-005',
-      assigned_official_id: 5,
-      distance_km: parseFloat(dist.toFixed(2)),
-      assignment_method: 'LOCAL_MUNICIPALITY_MATCH',
-      jurisdiction: 'Bommuluru / Gudivada Town, Krishna District'
-    };
-  }
-
-  // Fallback to closest available Sachivalayam
+  // Final fallback
+  const defaultSach = sachivalayams.find(s => s.id === 6) || sachivalayams[0];
   return {
-    sachivalayam_id: nearest ? nearest.id : 6,
-    sachivalayam_name: nearest ? nearest.name : 'Gudivada Ward Sachivalayam 05',
-    sachivalayam_code: nearest ? nearest.code : 'AP-KRI-GDV-005',
+    sachivalayam_id: defaultSach.id,
+    sachivalayam_name: defaultSach.name,
+    sachivalayam_code: defaultSach.code,
     assigned_official_id: 5,
-    distance_km: parseFloat(minDistance.toFixed(2)),
+    distance_km: 0.5,
     assignment_method: 'FALLBACK_CLOSEST',
-    jurisdiction: `${nearest ? nearest.village : 'Gudivada'}, Krishna District`
+    jurisdiction: `${defaultSach.village}, ${defaultSach.mandal}`
   };
 }

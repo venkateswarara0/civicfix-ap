@@ -38,7 +38,7 @@ export async function initDb() {
 
   // 2. Seed Users
   store.users = [
-    { id: 1, name: 'Ravi Kumar (Demo Citizen)', email: 'citizen@civicfix.in', password_hash: passwordHash, role: 'CITIZEN', phone: '+91 99887 76655', sachivalayam_id: null, created_at: new Date().toISOString() },
+    { id: 1, name: 'Ravi Kumar (Citizen)', email: 'citizen@civicfix.in', password_hash: passwordHash, role: 'CITIZEN', phone: '+91 99887 76655', sachivalayam_id: null, created_at: new Date().toISOString() },
     { id: 2, name: 'K. Venkatesh (Official)', email: 'official.patamata@civicfix.in', password_hash: passwordHash, role: 'OFFICIAL', phone: '+91 98480 12345', sachivalayam_id: 1, created_at: new Date().toISOString() },
     { id: 3, name: 'M. Lakshmi (Official)', email: 'official.suryaraopet@civicfix.in', password_hash: passwordHash, role: 'OFFICIAL', phone: '+91 98480 23456', sachivalayam_id: 2, created_at: new Date().toISOString() },
     { id: 4, name: 'Admin Officer (AP Civic Portal)', email: 'admin@civicfix.in', password_hash: passwordHash, role: 'ADMIN', phone: '+91 90000 00000', sachivalayam_id: null, created_at: new Date().toISOString() },
@@ -233,7 +233,7 @@ export async function dbGet(sql, params = []) {
     return store.sachivalayams.find(s => s.id == params[0]) || null;
   }
 
-  // ROBUST COMPLAINT BY ID OR TRACKING ID LOOKUP
+  // DYNAMIC COMPLAINT DETAIL RESOLUTION
   if (sqlTrim.includes('FROM complaints') && (sqlTrim.includes('id = ?') || sqlTrim.includes('c.id = ?') || sqlTrim.includes('tracking_id = ?'))) {
     const target = params[0];
     const c = store.complaints.find(comp => comp.id == target || comp.tracking_id == target);
@@ -241,15 +241,14 @@ export async function dbGet(sql, params = []) {
 
     let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
 
-    const addrStr = typeof c.address === 'string' ? c.address : '';
-    if (!sach || addrStr.includes('Gudivada') || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
-      sach = store.sachivalayams.find(s => s.id === 6) || sach;
-      c.sachivalayam_id = 6;
-      c.assigned_official_id = 5;
+    // If sachivalayam is missing, default to Gudivada Municipal Ward Sachivalayam 05
+    if (!sach) {
+      sach = store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
     }
 
     const citizen = store.users.find(u => u.id == c.citizen_id);
-    const official = store.users.find(u => u.id == (c.assigned_official_id || 5));
+    const official = store.users.find(u => u.role === 'OFFICIAL' && u.sachivalayam_id == sach.id) || store.users.find(u => u.id == (c.assigned_official_id || 5));
+
     return {
       ...c,
       citizen_name: citizen?.name || 'Ravi Kumar',
@@ -259,11 +258,11 @@ export async function dbGet(sql, params = []) {
       sachivalayam_code: sach?.code || 'AP-KRI-GDV-005',
       district: sach?.district || 'Krishna District',
       mandal: sach?.mandal || 'Gudivada Mandal',
-      village: sach?.village || 'Gudivada',
-      sachivalayam_contact_person: sach?.official_name || 'P. Srinivas (Ward Secretary, Gudivada)',
-      sachivalayam_phone: sach?.contact_phone || '+91 98480 67890',
-      official_name: official?.name || 'P. Srinivas',
-      official_phone: official?.phone || '+91 98480 67890'
+      village: sach?.village || 'Gudivada Town',
+      sachivalayam_contact_person: sach?.official_name || official?.name || 'P. Srinivas (Ward Secretary)',
+      sachivalayam_phone: sach?.contact_phone || official?.phone || '+91 98480 67890',
+      official_name: official?.name || sach?.official_name || 'Ward Officer',
+      official_phone: official?.phone || sach?.contact_phone || '+91 98480 67890'
     };
   }
 
@@ -300,19 +299,17 @@ export async function dbAll(sql, params = []) {
   if (sqlTrim.includes('FROM complaints')) {
     let list = store.complaints.map(c => {
       let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
-      const addrStr = typeof c.address === 'string' ? c.address : '';
-      if (!sach || addrStr.includes('Gudivada') || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
-        sach = store.sachivalayams.find(s => s.id === 6) || sach;
-        c.sachivalayam_id = 6;
+      if (!sach) {
+        sach = store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
       }
       const citizen = store.users.find(u => u.id == c.citizen_id);
-      const official = store.users.find(u => u.id == (c.assigned_official_id || 5));
+      const official = store.users.find(u => u.role === 'OFFICIAL' && u.sachivalayam_id == sach.id) || store.users.find(u => u.id == (c.assigned_official_id || 5));
       return {
         ...c,
         citizen_name: citizen?.name || 'Ravi Kumar',
         citizen_phone: citizen?.phone || '+91 99887 76655',
-        sachivalayam_name: sach?.name || 'Gudivada Municipal Ward Sachivalayam 05',
-        official_name: official?.name || 'P. Srinivas'
+        sachivalayam_name: sach?.name || 'Gudivada Ward Sachivalayam 05',
+        official_name: official?.name || sach?.official_name || 'Ward Officer'
       };
     });
 

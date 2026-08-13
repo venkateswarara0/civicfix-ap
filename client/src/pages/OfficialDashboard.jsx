@@ -11,10 +11,6 @@ import {
   Upload, 
   Play, 
   XCircle, 
-  Sparkles,
-  Filter,
-  Search,
-  Check,
   ChevronRight
 } from 'lucide-react';
 
@@ -22,6 +18,7 @@ export default function OfficialDashboard() {
   const { user } = useAuth();
 
   const [complaints, setComplaints] = useState([]);
+  const [sachivalayamInfo, setSachivalayamInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [selectedComplaint, setSelectedComplaint] = useState(null);
@@ -35,7 +32,22 @@ export default function OfficialDashboard() {
 
   useEffect(() => {
     fetchOfficialComplaints();
+    if (user?.sachivalayam_id) {
+      fetchSachivalayamDetails(user.sachivalayam_id);
+    }
   }, [user]);
+
+  const fetchSachivalayamDetails = async (id) => {
+    try {
+      const res = await fetch(`/api/sachivalayams/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSachivalayamInfo(data.sachivalayam);
+      }
+    } catch (err) {
+      console.error('Failed to load Sachivalayam info:', err);
+    }
+  };
 
   const fetchOfficialComplaints = async () => {
     setLoading(true);
@@ -181,8 +193,10 @@ export default function OfficialDashboard() {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Logged in as <strong className="text-slate-200">{user?.name}</strong> • Assigned Jurisdiction:{' '}
-                <span className="text-emerald-400 font-bold">{user?.sachivalayam_id ? 'Patamata / Gudivada Ward Sachivalayam' : 'AP Central Portal'}</span>
+                Logged in as <strong className="text-slate-200">{user?.name}</strong> • Jurisdiction:{' '}
+                <span className="text-emerald-400 font-bold">
+                  {sachivalayamInfo ? `${sachivalayamInfo.name} (${sachivalayamInfo.village})` : 'Gudivada Municipal Ward Sachivalayam 05'}
+                </span>
               </p>
             </div>
           </div>
@@ -241,7 +255,7 @@ export default function OfficialDashboard() {
           <div className="glass-card p-12 rounded-3xl border border-slate-800 text-center space-y-3">
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
             <h3 className="text-lg font-bold text-white">No complaints found for filter: {filterStatus}</h3>
-            <p className="text-xs text-slate-400">All local civic issues under your jurisdiction are up to date.</p>
+            <p className="text-xs text-slate-400">All local civic issues under your Sachivalayam jurisdiction are up to date.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

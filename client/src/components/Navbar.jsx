@@ -3,23 +3,23 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShieldAlert, 
-  PlusCircle, 
+  MapPin, 
   FileText, 
   Building2, 
   LayoutDashboard, 
-  Bell, 
   LogOut, 
-  User, 
-  CheckCircle2, 
-  Sparkles,
-  Menu,
+  LogIn, 
+  UserPlus, 
+  Bell, 
+  Menu, 
   X
 } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, logout, login } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -41,62 +41,45 @@ export default function Navbar() {
         setNotifications(data.notifications || []);
       }
     } catch (err) {
-      console.error('Failed to load notifications:', err);
+      console.error('Failed to fetch notifications:', err);
     }
   };
 
-  const handleDemoLogin = async (email) => {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'password123' })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        login(data.token, data.user);
-        if (data.user.role === 'ADMIN') navigate('/admin/dashboard');
-        else if (data.user.role === 'OFFICIAL') navigate('/official/dashboard');
-        else navigate('/track');
-      }
-    } catch (err) {
-      console.error('Demo login error:', err);
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <nav className="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <nav className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Logo & Region Badge */}
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 p-0.5 shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                  <ShieldAlert className="w-6 h-6 text-emerald-400" />
-                </div>
+          {/* Brand Logo & Title */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-emerald-500 to-cyan-500 p-0.5 shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-300">
+              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                <ShieldAlert className="w-5 h-5 text-emerald-400" />
               </div>
-              <div>
-                <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-                  CivicFix
-                </span>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">AP Sachivalayam Portal</span>
-                </div>
-              </div>
-            </Link>
-          </div>
+            </div>
+            <div>
+              <span className="text-lg font-extrabold text-white tracking-tight group-hover:text-emerald-400 transition-colors">
+                CivicFix
+              </span>
+              <span className="text-[10px] font-bold text-amber-400 block -mt-1 tracking-wider uppercase">
+                • AP Sachivalayam Portal
+              </span>
+            </div>
+          </Link>
 
-          {/* Desktop Navigation Links */}
+          {/* Navigation Links - Desktop */}
           <div className="hidden md:flex items-center space-x-1">
             <Link
               to="/"
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === '/' ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                location.pathname === '/' ? 'bg-slate-800 text-emerald-400 font-bold' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               Home
@@ -104,20 +87,18 @@ export default function Navbar() {
 
             <Link
               to="/report"
-              className={`px-3.5 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all ${
-                location.pathname === '/report'
-                  ? 'bg-emerald-500 text-slate-950 font-bold'
-                  : 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-slate-950'
+              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                location.pathname === '/report' ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20' : 'text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30'
               }`}
             >
-              <PlusCircle className="w-4 h-4" />
+              <MapPin className="w-4 h-4" />
               Report Problem
             </Link>
 
             <Link
               to="/track"
               className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                location.pathname === '/track' ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                location.pathname === '/track' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <FileText className="w-4 h-4 text-cyan-400" />
@@ -128,11 +109,11 @@ export default function Navbar() {
               <Link
                 to="/official/dashboard"
                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                  location.pathname.startsWith('/official') ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  location.pathname.startsWith('/official') ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 <Building2 className="w-4 h-4 text-amber-400" />
-                Sachivalayam Portal
+                Official Workbench
               </Link>
             )}
 
@@ -140,7 +121,7 @@ export default function Navbar() {
               <Link
                 to="/admin/dashboard"
                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                  location.pathname.startsWith('/admin') ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  location.pathname.startsWith('/admin') ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 font-bold' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 <LayoutDashboard className="w-4 h-4 text-purple-400" />
@@ -149,47 +130,14 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* User & Demo Switcher */}
+          {/* User Section */}
           <div className="hidden md:flex items-center space-x-3">
-            {/* Quick Demo Login Switcher */}
-            <div className="relative group">
-              <button className="flex items-center gap-1.5 text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg hover:border-slate-600 transition">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Demo Accounts</span>
-              </button>
-              
-              <div className="absolute right-0 top-full mt-1 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 hidden group-hover:block z-50">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">Quick Switch Persona</div>
-                <button
-                  onClick={() => handleDemoLogin('citizen@civicfix.in')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between"
-                >
-                  <span>👤 Citizen (Ravi)</span>
-                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">User</span>
-                </button>
-                <button
-                  onClick={() => handleDemoLogin('official.patamata@civicfix.in')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between"
-                >
-                  <span>🏛️ Official (Patamata)</span>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">Officer</span>
-                </button>
-                <button
-                  onClick={() => handleDemoLogin('admin@civicfix.in')}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between"
-                >
-                  <span>🛡️ State Admin</span>
-                  <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">Admin</span>
-                </button>
-              </div>
-            </div>
-
             {/* Notifications Icon */}
             {user && (
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 relative"
+                  className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 relative transition"
                 >
                   <Bell className="w-5 h-5" />
                   {unreadCount > 0 && (
@@ -224,28 +172,30 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Profile / Logout */}
+            {/* Profile / Login Button */}
             {user ? (
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+              <div className="flex items-center gap-3 pl-2 border-l border-slate-800">
                 <div className="text-right">
-                  <div className="text-xs font-semibold text-slate-200">{user.name}</div>
-                  <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">{user.role}</span>
+                  <div className="text-xs font-bold text-slate-200">{user.name}</div>
+                  <div className="text-[10px] text-emerald-400 font-mono uppercase font-bold">{user.role}</div>
                 </div>
                 <button
-                  onClick={logout}
-                  title="Logout"
+                  onClick={handleLogout}
                   className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                  title="Sign Out"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-5 h-5" />
                 </button>
               </div>
             ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition"
-              >
-                Sign In
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition"
+                >
+                  Sign In
+                </Link>
+              </div>
             )}
           </div>
 
@@ -306,29 +256,23 @@ export default function Navbar() {
             </Link>
           )}
 
-          {/* Demo account quick login on mobile */}
-          <div className="pt-2 border-t border-slate-800 space-y-1">
-            <div className="text-[10px] text-slate-500 uppercase font-bold px-2">Quick Switch Account</div>
-            <div className="grid grid-cols-3 gap-1">
+          <div className="pt-2 border-t border-slate-800">
+            {user ? (
               <button
-                onClick={() => { handleDemoLogin('citizen@civicfix.in'); setMobileMenuOpen(false); }}
-                className="text-[11px] bg-slate-800 p-1.5 rounded text-slate-300"
+                onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-red-400 font-bold text-xs"
               >
-                👤 Citizen
+                Sign Out ({user.name})
               </button>
-              <button
-                onClick={() => { handleDemoLogin('official.patamata@civicfix.in'); setMobileMenuOpen(false); }}
-                className="text-[11px] bg-slate-800 p-1.5 rounded text-amber-400"
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-center px-4 py-2 bg-slate-800 text-slate-200 font-bold text-xs rounded-xl"
               >
-                🏛️ Official
-              </button>
-              <button
-                onClick={() => { handleDemoLogin('admin@civicfix.in'); setMobileMenuOpen(false); }}
-                className="text-[11px] bg-slate-800 p-1.5 rounded text-purple-400"
-              >
-                🛡️ Admin
-              </button>
-            </div>
+                Sign In / Register
+              </Link>
+            )}
           </div>
         </div>
       )}

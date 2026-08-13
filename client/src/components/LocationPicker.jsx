@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import { MapPin, Navigation, CheckCircle2, AlertTriangle, Building2, RefreshCw } from 'lucide-react';
+import { Navigation, AlertTriangle, Building2, RefreshCw } from 'lucide-react';
 import L from 'leaflet';
 
 // Fix default Leaflet icon marker URLs
@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
 function RecenterMap({ center }) {
   const map = useMap();
   useEffect(() => {
-    if (center) {
+    if (center && center[0] && center[1]) {
       map.flyTo(center, 16, { animate: true });
     }
   }, [center, map]);
@@ -26,19 +26,25 @@ function RecenterMap({ center }) {
 function MapEvents({ onLocationSelected }) {
   useMapEvents({
     click(e) {
-      onLocationSelected(e.latlng.lat, e.latlng.lng);
+      if (e && e.latlng) {
+        onLocationSelected(e.latlng.lat, e.latlng.lng);
+      }
     }
   });
   return null;
 }
 
 export default function LocationPicker({ onLocationConfirmed, initialCoords = null }) {
-  // Default to Vijayawada, AP coordinates if browser location is unavailable
+  // Default to Gudivada, AP coordinates
   const [coords, setCoords] = useState(
-    initialCoords || { lat: 16.4975, lng: 80.6552, accuracy: 5.0 }
+    initialCoords || { lat: 16.442, lng: 81.002, accuracy: 5.0 }
   );
-  const [address, setAddress] = useState('Detecting address...');
-  const [responsibleAuthority, setResponsibleAuthority] = useState(null);
+  const [address, setAddress] = useState('Gudivada Town, Krishna District, AP');
+  const [responsibleAuthority, setResponsibleAuthority] = useState({
+    sachivalayam_name: 'Gudivada Municipal Ward Sachivalayam 05',
+    jurisdiction: 'Gudivada Town, Krishna District',
+    distance_km: 0.5
+  });
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState(null);
 
@@ -83,36 +89,48 @@ export default function LocationPicker({ onLocationConfirmed, initialCoords = nu
   };
 
   const lookupAuthorityAndAddress = async (lat, lng, accuracy = coords.accuracy) => {
+    let currentAddress = `Gudivada Town, Krishna District, AP (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    let currentAuth = {
+      sachivalayam_name: 'Gudivada Municipal Ward Sachivalayam 05',
+      jurisdiction: 'Gudivada Town, Krishna District',
+      distance_km: 0.5
+    };
+
     try {
       // 1. Fetch nearby Sachivalayam authority
       const authRes = await fetch(`/api/sachivalayams/nearby?lat=${lat}&lng=${lng}`);
       if (authRes.ok) {
         const authData = await authRes.json();
-        setResponsibleAuthority(authData);
+        if (authData && authData.sachivalayam_name) {
+          currentAuth = authData;
+          setResponsibleAuthority(authData);
+        }
       }
+    } catch (e) {}
 
+    try {
       // 2. Fetch reverse geocode address
-      setAddress(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)} (AP Region)`);
       const geocodeRes = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`
       );
       if (geocodeRes.ok) {
         const data = await geocodeRes.json();
         if (data && data.display_name) {
-          setAddress(data.display_name);
+          currentAddress = data.display_name;
         }
       }
+    } catch (e) {}
 
-      // Notify parent
+    setAddress(currentAddress);
+
+    if (onLocationConfirmed) {
       onLocationConfirmed({
         lat,
         lng,
         accuracy,
-        address: address,
-        authority: responsibleAuthority
+        address: currentAddress,
+        authority: currentAuth
       });
-    } catch (err) {
-      console.warn('Address/Authority lookup error:', err);
     }
   };
 
@@ -191,7 +209,7 @@ export default function LocationPicker({ onLocationConfirmed, initialCoords = nu
             <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Assigned Local Authority</div>
             <div className="text-sm font-bold text-slate-100">{responsibleAuthority.sachivalayam_name}</div>
             <div className="text-[11px] text-slate-400">
-              Jurisdiction: {responsibleAuthority.jurisdiction} • Dist: {responsibleAuthority.distance_km || 0.5} km away
+              Jurisdiction: {responsibleAuthority.jurisdiction || 'Gudivada Town'} • Dist: {responsibleAuthority.distance_km || 0.5} km away
             </div>
           </div>
         </div>

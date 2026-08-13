@@ -87,7 +87,7 @@ export async function dbRun(sql, params = []) {
     return { lastID: user.id, changes: 1 };
   }
 
-  // Sachivalyams INSERT
+  // Sachivalayams INSERT
   if (sqlTrim.startsWith('INSERT INTO sachivalayams')) {
     const sach = {
       id: store.sachivalayamSeq++,
@@ -124,7 +124,7 @@ export async function dbRun(sql, params = []) {
       lat: parseFloat(params[7]),
       lng: parseFloat(params[8]),
       location_accuracy: parseFloat(params[9]) || 5.0,
-      address: params[10] || 'Andhra Pradesh',
+      address: typeof params[10] === 'string' ? params[10] : 'Andhra Pradesh',
       sachivalayam_id: params[11] || 6,
       assigned_official_id: params[12] || 5,
       priority: params[13] || 'MEDIUM',
@@ -241,8 +241,8 @@ export async function dbGet(sql, params = []) {
 
     let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
 
-    // If location is in Gudivada or address mentions Gudivada, ensure Sachivalayam is Gudivada Municipal Ward Sachivalayam 05
-    if (!sach || (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
+    const addrStr = typeof c.address === 'string' ? c.address : '';
+    if (!sach || addrStr.includes('Gudivada') || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
       sach = store.sachivalayams.find(s => s.id === 6) || sach;
       c.sachivalayam_id = 6;
       c.assigned_official_id = 5;
@@ -300,7 +300,8 @@ export async function dbAll(sql, params = []) {
   if (sqlTrim.includes('FROM complaints')) {
     let list = store.complaints.map(c => {
       let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
-      if (!sach || (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
+      const addrStr = typeof c.address === 'string' ? c.address : '';
+      if (!sach || addrStr.includes('Gudivada') || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15)) {
         sach = store.sachivalayams.find(s => s.id === 6) || sach;
         c.sachivalayam_id = 6;
       }
@@ -310,7 +311,7 @@ export async function dbAll(sql, params = []) {
         ...c,
         citizen_name: citizen?.name || 'Ravi Kumar',
         citizen_phone: citizen?.phone || '+91 99887 76655',
-        sachivalayam_name: sach?.name || 'Gudivada Ward Sachivalayam 05',
+        sachivalayam_name: sach?.name || 'Gudivada Municipal Ward Sachivalayam 05',
         official_name: official?.name || 'P. Srinivas'
       };
     });

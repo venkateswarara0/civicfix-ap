@@ -241,9 +241,11 @@ export async function dbGet(sql, params = []) {
 
     let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
 
-    // If sachivalayam is missing, default to Gudivada Municipal Ward Sachivalayam 05
-    if (!sach) {
-      sach = store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
+    // Auto-correct if complaint was assigned to Tirupati (id: 5) but is located in Gudivada
+    const isGudivadaLoc = (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15);
+    if (!sach || (sach.id === 5 && isGudivadaLoc)) {
+      sach = store.sachivalayams.find(s => s.mandal?.includes('Gudivada') || s.name?.includes('Gudivada') || s.village?.includes('Gudivada')) || store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
+      c.sachivalayam_id = sach.id;
     }
 
     const citizen = store.users.find(u => u.id == c.citizen_id);
@@ -259,7 +261,7 @@ export async function dbGet(sql, params = []) {
       district: sach?.district || 'Krishna District',
       mandal: sach?.mandal || 'Gudivada Mandal',
       village: sach?.village || 'Gudivada Town',
-      sachivalayam_contact_person: sach?.official_name || official?.name || 'P. Srinivas (Ward Secretary)',
+      sachivalayam_contact_person: sach?.official_name || official?.name || 'Ward Secretary',
       sachivalayam_phone: sach?.contact_phone || official?.phone || '+91 98480 67890',
       official_name: official?.name || sach?.official_name || 'Ward Officer',
       official_phone: official?.phone || sach?.contact_phone || '+91 98480 67890'
@@ -299,8 +301,10 @@ export async function dbAll(sql, params = []) {
   if (sqlTrim.includes('FROM complaints')) {
     let list = store.complaints.map(c => {
       let sach = store.sachivalayams.find(s => s.id == c.sachivalayam_id);
-      if (!sach) {
-        sach = store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
+      const isGudivadaLoc = (c.address && c.address.includes('Gudivada')) || (c.lat >= 16.30 && c.lat <= 16.55 && c.lng >= 80.90 && c.lng <= 81.15);
+      if (!sach || (sach.id === 5 && isGudivadaLoc)) {
+        sach = store.sachivalayams.find(s => s.mandal?.includes('Gudivada') || s.name?.includes('Gudivada') || s.village?.includes('Gudivada')) || store.sachivalayams.find(s => s.id === 6) || store.sachivalayams[0];
+        c.sachivalayam_id = sach.id;
       }
       const citizen = store.users.find(u => u.id == c.citizen_id);
       const official = store.users.find(u => u.role === 'OFFICIAL' && u.sachivalayam_id == sach.id) || store.users.find(u => u.id == (c.assigned_official_id || 5));

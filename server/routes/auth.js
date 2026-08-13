@@ -59,12 +59,19 @@ router.post('/register', async (req, res) => {
       const village = custom_sachivalayam.village || sachName;
       const code = 'AP-' + district.substring(0, 3).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
 
-      const coords = getAPTownCoordinates(mandal, district, village);
+      const defaultCoords = getAPTownCoordinates(mandal, district, village);
+      const sachLat = custom_sachivalayam.lat ? parseFloat(custom_sachivalayam.lat) : defaultCoords.lat;
+      const sachLng = custom_sachivalayam.lng ? parseFloat(custom_sachivalayam.lng) : defaultCoords.lng;
+
+      const minLat = sachLat - 0.08;
+      const maxLat = sachLat + 0.08;
+      const minLng = sachLng - 0.08;
+      const maxLng = sachLng + 0.08;
 
       const sachResult = await dbRun(
         `INSERT INTO sachivalayams (name, code, district, mandal, village, lat, lng, min_lat, max_lat, min_lng, max_lng, official_name, contact_phone)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [sachName, code, district, mandal, village, coords.lat, coords.lng, coords.min_lat, coords.max_lat, coords.min_lng, coords.max_lng, name.trim(), phone || null]
+        [sachName, code, district, mandal, village, sachLat, sachLng, minLat, maxLat, minLng, maxLng, name.trim(), phone || null]
       );
       assignedSachivalayamId = sachResult.lastID;
     }

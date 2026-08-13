@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, User, Lock, Mail, Phone, Building2, ArrowRight, Loader2, UserCheck, PlusCircle, MapPin } from 'lucide-react';
+import InteractiveMap from '../components/InteractiveMap';
+import { 
+  ShieldAlert, 
+  User, 
+  Lock, 
+  Mail, 
+  Phone, 
+  Building2, 
+  ArrowRight, 
+  Loader2, 
+  UserCheck, 
+  MapPin,
+  Navigation
+} from 'lucide-react';
 
 export default function AuthPage() {
   const { login } = useAuth();
@@ -24,6 +37,9 @@ export default function AuthPage() {
   const [customDistrict, setCustomDistrict] = useState('Krishna District');
   const [customMandal, setCustomMandal] = useState('Gudivada Mandal');
   const [customVillage, setCustomVillage] = useState('Gudivada Town');
+  const [sachLat, setSachLat] = useState(16.442);
+  const [sachLng, setSachLng] = useState(81.002);
+  const [detectingGps, setDetectingGps] = useState(false);
 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -48,6 +64,29 @@ export default function AuthPage() {
     }
   };
 
+  const handleDetectGps = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+    setDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setSachLat(pos.coords.latitude);
+        setSachLng(pos.coords.longitude);
+        setDetectingGps(false);
+      },
+      (err) => {
+        console.error('GPS Detection failed:', err);
+        setDetectingGps(false);
+        // Default to Gudivada center
+        setSachLat(16.442);
+        setSachLng(81.002);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -68,7 +107,9 @@ export default function AuthPage() {
           sachivalayam_name: customSachName || `${customVillage} Ward/Grama Sachivalayam`,
           district: customDistrict,
           mandal: customMandal,
-          village: customVillage
+          village: customVillage,
+          lat: sachLat,
+          lng: sachLng
         } : null
       };
     }
@@ -175,7 +216,7 @@ export default function AuthPage() {
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4" /> Sachivalayam Jurisdiction *
+                  <Building2 className="w-4 h-4" /> Sachivalayam Jurisdiction & GPS Location *
                 </label>
 
                 <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
@@ -251,6 +292,32 @@ export default function AuthPage() {
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
                     />
                   </div>
+
+                  {/* Sachivalayam Office GPS Coordinates Capture */}
+                  <div className="pt-2 space-y-1.5 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" /> Sachivalayam GPS Office Building Location
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleDetectGps}
+                        disabled={detectingGps}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[10px] font-bold flex items-center gap-1 border border-amber-500/30"
+                      >
+                        <Navigation className="w-3 h-3" /> {detectingGps ? 'Detecting...' : 'Detect Current GPS'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
+                        <span className="text-slate-500">Lat:</span> {sachLat.toFixed(5)}
+                      </div>
+                      <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-300">
+                        <span className="text-slate-500">Lng:</span> {sachLng.toFixed(5)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-1 pt-1">
@@ -269,7 +336,7 @@ export default function AuthPage() {
               )}
 
               <p className="text-[10px] text-slate-400 leading-tight">
-                Registered Sachivalayam Head will manage and resolve all civic complaints reported in this jurisdiction.
+                Citizens reporting nearby civic problems will automatically be assigned to your Sachivalayam based on exact GPS distance.
               </p>
             </div>
           )}

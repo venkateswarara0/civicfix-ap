@@ -27,22 +27,38 @@ function getAPTownCoordinates(mandal, district, village) {
   return { lat: 16.442, lng: 81.002, min_lat: 16.35, max_lat: 16.52, min_lng: 80.90, max_lng: 81.10 };
 }
 
-// Helper to auto-sync local complaints to a newly registered Sachivalayam Head
-async function syncLocalComplaintsToSachivalayam(sachivalayamId, sachLat, sachLng, officialUserId) {
+// Helper to auto-create Sachivalayam for Official if missing
+async function ensureOfficialSachivalayam(officialName, phone, customData) {
+  const sachName = customData?.sachivalayam_name?.trim() || 'Gudivada Municipal Ward Sachivalayam 05';
+  const district = customData?.district || 'Krishna District';
+  const mandal = customData?.mandal || 'Gudivada Mandal';
+  const village = customData?.village || 'Gudivada Town';
+  const code = 'AP-' + district.substring(0, 3).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
+
+  const defaultCoords = getAPTownCoordinates(mandal, district, village);
+  const sachLat = customData?.lat ? parseFloat(customData.lat) : defaultCoords.lat;
+  const sachLng = customData?.lng ? parseFloat(customData.lng) : defaultCoords.lng;
+
+  const sachResult = await dbRun(
+    `INSERT INTO sachivalayams (name, code, district, mandal, village, lat, lng, min_lat, max_lat, min_lng, max_lng, official_name, contact_phone)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [sachName, code, district, mandal, village, sachLat, sachLng, sachLat - 0.08, sachLat + 0.08, sachLng - 0.08, sachLng + 0.08, officialName, phone || null]
+  );
+
+  const sachId = sachResult.lastID;
+
+  // Auto-sync unassigned complaints in that area
   try {
     const allComplaints = await dbAll('SELECT * FROM complaints');
     for (const c of allComplaints) {
-      if (!c.sachivalayam_id || c.sachivalayam_id === 'AP-PENDING') {
-        const dist = calculateHaversineDistance(c.lat, c.lng, sachLat, sachLng);
-        if (dist <= 50) {
-          c.sachivalayam_id = sachivalayamId;
-          c.assigned_official_id = officialUserId;
-        }
+      const dist = calculateHaversineDistance(c.lat, c.lng, sachLat, sachLng);
+      if (!c.sachivalayam_id || c.sachivalayam_id === 'AP-PENDING' || dist <= 50) {
+        c.sachivalayam_id = sachId;
       }
     }
-  } catch (err) {
-    console.error('Failed to sync complaints:', err);
-  }
+  } catch (e) {}
+
+  return { sachId, sachLat, sachLng };
 }
 
 // Register Citizen / Official
@@ -63,12 +79,20 @@ router.post('/register', async (req, res) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    let assignedSachivalayamId = sachivalayam_id ? parseInt(sachivalayam_id) : null;
+
+    if (role === 'OFFICIAL') {
+      const created = await ensureOfficialSachivalayam(name.trim(), phone, custom_sachivalayam);
+      assignedSachivalayamId = created.sachId;
+    }
+
     const existing = await dbGet('SELECT id FROM users WHERE email = ?', [cleanEmail]);
     if (existing) {
       const passwordHash = await bcrypt.hash(password, 10);
       existing.password_hash = passwordHash;
       if (role) existing.role = role;
       if (phone) existing.phone = phone;
+      if (assignedSachivalayamId) existing.sachivalayam_id = assignedSachivalayamId;
 
       const userData = {
         id: existing.id,
@@ -76,39 +100,10 @@ router.post('/register', async (req, res) => {
         email: cleanEmail,
         role: existing.role || role,
         phone: existing.phone || phone,
-        sachivalayam_id: existing.sachivalayam_id || sachivalayam_id
+        sachivalayam_id: existing.sachivalayam_id || assignedSachivalayamId
       };
       const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '30d' });
       return res.status(200).json({ message: 'Account updated successfully', token, user: userData });
-    }
-
-    let assignedSachivalayamId = sachivalayam_id ? parseInt(sachivalayam_id) : null;
-    let registeredSachLat = 16.442;
-    let registeredSachLng = 81.002;
-
-    // ALWAYS ensure a Sachivalayam record is created when Official registers
-    if (role === 'OFFICIAL') {
-      const sachName = custom_sachivalayam?.sachivalayam_name?.trim() || 'Gudivada Municipal Ward Sachivalayam 05';
-      const district = custom_sachivalayam?.district || 'Krishna District';
-      const mandal = custom_sachivalayam?.mandal || 'Gudivada Mandal';
-      const village = custom_sachivalayam?.village || 'Gudivada Town';
-      const code = 'AP-' + district.substring(0, 3).toUpperCase() + '-' + Math.floor(100 + Math.random() * 900);
-
-      const defaultCoords = getAPTownCoordinates(mandal, district, village);
-      registeredSachLat = custom_sachivalayam?.lat ? parseFloat(custom_sachivalayam.lat) : defaultCoords.lat;
-      registeredSachLng = custom_sachivalayam?.lng ? parseFloat(custom_sachivalayam.lng) : defaultCoords.lng;
-
-      const minLat = registeredSachLat - 0.08;
-      const maxLat = registeredSachLat + 0.08;
-      const minLng = registeredSachLng - 0.08;
-      const maxLng = registeredSachLng + 0.08;
-
-      const sachResult = await dbRun(
-        `INSERT INTO sachivalayams (name, code, district, mandal, village, lat, lng, min_lat, max_lat, min_lng, max_lng, official_name, contact_phone)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [sachName, code, district, mandal, village, registeredSachLat, registeredSachLng, minLat, maxLat, minLng, maxLng, name.trim(), phone || null]
-      );
-      assignedSachivalayamId = sachResult.lastID;
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -126,10 +121,6 @@ router.post('/register', async (req, res) => {
       sachivalayam_id: assignedSachivalayamId
     };
 
-    if (role === 'OFFICIAL' && assignedSachivalayamId) {
-      await syncLocalComplaintsToSachivalayam(assignedSachivalayamId, registeredSachLat, registeredSachLng, user.id);
-    }
-
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '30d' });
 
     res.status(201).json({
@@ -143,7 +134,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login with Auto-Account Recovery
+// Login with Auto-Account Recovery & Sachivalayam Auto-Provisioning
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -166,12 +157,8 @@ router.post('/login', async (req, res) => {
 
       let sachId = null;
       if (role === 'OFFICIAL') {
-        const sachResult = await dbRun(
-          `INSERT INTO sachivalayams (name, code, district, mandal, village, lat, lng, min_lat, max_lat, min_lng, max_lng, official_name, contact_phone)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          ['Gudivada Municipal Ward Sachivalayam 05', 'AP-KRI-GDV-005', 'Krishna District', 'Gudivada Mandal', 'Gudivada Town', 16.442, 81.002, 16.35, 16.52, 80.90, 81.10, formattedName, '+91 98480 12345']
-        );
-        sachId = sachResult.lastID;
+        const created = await ensureOfficialSachivalayam(formattedName, '+91 98480 12345', null);
+        sachId = created.sachId;
       }
 
       const regResult = await dbRun(
@@ -188,10 +175,9 @@ router.post('/login', async (req, res) => {
         sachivalayam_id: sachId,
         password_hash: pwdHash
       };
-
-      if (role === 'OFFICIAL' && sachId) {
-        await syncLocalComplaintsToSachivalayam(sachId, 16.442, 81.002, user.id);
-      }
+    } else if (user.role === 'OFFICIAL' && !user.sachivalayam_id) {
+      const created = await ensureOfficialSachivalayam(user.name, user.phone, null);
+      user.sachivalayam_id = created.sachId;
     }
 
     let isMatch = false;
@@ -241,13 +227,19 @@ router.get('/me', async (req, res) => {
 
     // Session Recovery from JWT decoded payload if memory reset
     if (!user && decoded.email) {
+      let sachId = decoded.sachivalayam_id;
+      if (decoded.role === 'OFFICIAL' && !sachId) {
+        const created = await ensureOfficialSachivalayam(decoded.name || 'Official', decoded.phone, null);
+        sachId = created.sachId;
+      }
+
       user = {
         id: decoded.id,
         name: decoded.name || 'User',
         email: decoded.email,
         role: decoded.role || 'CITIZEN',
         phone: decoded.phone || null,
-        sachivalayam_id: decoded.sachivalayam_id || null
+        sachivalayam_id: sachId
       };
 
       await dbRun(

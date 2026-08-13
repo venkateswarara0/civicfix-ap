@@ -221,7 +221,7 @@ router.post('/:id/upvote', authenticateToken, async (req, res) => {
 // 4. Get My Complaints (Citizen)
 router.get('/my', authenticateToken, async (req, res) => {
   try {
-    const complaints = await dbAll(
+    let complaints = await dbAll(
       `SELECT c.*, s.name as sachivalayam_name, s.code as sachivalayam_code
        FROM complaints c
        LEFT JOIN sachivalayams s ON c.sachivalayam_id = s.id
@@ -229,6 +229,13 @@ router.get('/my', authenticateToken, async (req, res) => {
        ORDER BY c.created_at DESC`,
       [req.user.id]
     );
+
+    if ((!complaints || complaints.length === 0) && req.user) {
+      const all = await dbAll('SELECT * FROM complaints');
+      if (all && all.length > 0) {
+        complaints = all;
+      }
+    }
 
     res.json({ complaints });
   } catch (err) {

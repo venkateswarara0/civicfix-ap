@@ -5,14 +5,12 @@ import {
   FileText, 
   MapPin, 
   Building2, 
-  Clock, 
   CheckCircle2, 
-  AlertCircle, 
   PlusCircle, 
   ArrowRight, 
   RefreshCw,
   Search,
-  Filter
+  ChevronRight
 } from 'lucide-react';
 
 export default function TrackComplaints() {
@@ -49,9 +47,9 @@ export default function TrackComplaints() {
     const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
     const matchesSearch =
       !searchQuery ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.tracking_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.category_name.toLowerCase().includes(searchQuery.toLowerCase());
+      (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (c.tracking_id && c.tracking_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (c.category_name && c.category_name.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesStatus && matchesSearch;
   });
 
@@ -82,19 +80,30 @@ export default function TrackComplaints() {
         <div className="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Status Tabs */}
           <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-            {['ALL', 'SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'REOPENED'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  statusFilter === st
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
+            {['ALL', 'SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'REOPENED'].map((st) => {
+              const count = st === 'ALL'
+                ? complaints.length
+                : complaints.filter(c => c.status === st).length;
+
+              return (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
+                    statusFilter === st
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  <span>{st}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    statusFilter === st ? 'bg-slate-950 text-emerald-400 font-mono' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Search Box */}
@@ -118,90 +127,92 @@ export default function TrackComplaints() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="glass-card p-12 rounded-3xl border border-slate-800 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-slate-900 text-slate-500 flex items-center justify-center mx-auto">
-              <FileText className="w-8 h-8" />
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-500 flex items-center justify-center mx-auto">
+              <FileText className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-200">No Complaints Found</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              You haven't reported any civic problems matching this criteria yet.
-            </p>
-            <Link
-              to="/report"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
-            >
-              Report a Problem Now
-            </Link>
+            <h3 className="text-lg font-bold text-white">No Complaints Found for filter: {statusFilter}</h3>
+            
+            {complaints.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-xs text-amber-400">
+                  You have <strong>{complaints.length} complaint(s)</strong> under other status tabs (e.g. SUBMITTED).
+                </p>
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg"
+                >
+                  Show All {complaints.length} Reported Complaints
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400">You haven't reported any civic problems yet.</p>
+                <Link
+                  to="/report"
+                  className="inline-flex px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                >
+                  Report a Problem Now
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((c) => (
-              <div
+              <Link
                 key={c.id}
-                className="glass-card rounded-2xl overflow-hidden border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between group"
+                to={`/complaints/${c.id}`}
+                className="glass-card p-5 rounded-3xl border border-slate-800 hover:border-cyan-500/50 space-y-4 transition-all group shadow-lg flex flex-col justify-between"
               >
-                <div>
-                  {/* Photo Banner */}
-                  <div className="relative h-44 overflow-hidden bg-slate-900">
-                    <img
-                      src={c.original_image_url}
-                      alt={c.category_name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-cyan-400 border border-slate-800">
-                      #{c.tracking_id}
-                    </div>
-
-                    <div className="absolute top-3 right-3">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        c.status === 'RESOLVED' ? 'bg-emerald-500 text-slate-950' :
-                        c.status === 'IN_PROGRESS' ? 'bg-amber-500 text-slate-950' :
-                        c.status === 'REOPENED' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'
-                      }`}>
-                        {c.status}
-                      </span>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-[11px]">
+                      {c.category_name}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
+                      c.status === 'RESOLVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                      c.status === 'IN_PROGRESS' ? 'bg-amber-500/20 text-amber-400' :
+                      c.status === 'REOPENED' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {c.status}
+                    </span>
                   </div>
 
-                  {/* Body Content */}
-                  <div className="p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-                        {c.category_name}
-                      </span>
-                      <span className="text-[10px] text-slate-500">
-                        {new Date(c.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <h3 className="text-sm font-bold text-slate-100 line-clamp-2 leading-snug">
+                  <div className="space-y-1">
+                    <div className="font-mono text-[10px] text-cyan-400 font-bold">#{c.tracking_id}</div>
+                    <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-cyan-400 transition">
                       {c.description}
                     </h3>
+                  </div>
 
-                    <div className="text-[11px] text-slate-400 space-y-1">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span className="truncate">{c.address || `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="truncate">{c.sachivalayam_name || 'Patamata Sachivalayam'}</span>
-                      </div>
+                  {c.original_image_url && (
+                    <div className="h-36 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 relative">
+                      <img
+                        src={c.original_image_url}
+                        alt={c.category_name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-slate-400 space-y-1 pt-2 border-t border-slate-800">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate">{c.address || `${c.lat}, ${c.lng}`}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 truncate text-emerald-400">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span className="truncate">{c.sachivalayam_name || 'Gudivada Municipal Ward Sachivalayam 05'}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Footer Action */}
-                <div className="p-4 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500">Priority: <strong className="text-slate-300">{c.priority}</strong></span>
-                  <Link
-                    to={`/complaints/${c.id}`}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-400 flex items-center gap-1 transition"
-                  >
-                    View Status & Proof <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                <div className="pt-2">
+                  <div className="w-full py-2.5 rounded-xl bg-slate-900 group-hover:bg-cyan-500 group-hover:text-slate-950 font-extrabold text-xs text-slate-300 flex items-center justify-center gap-1.5 transition">
+                    View Live Resolution Proof <ChevronRight className="w-4 h-4" />
+                  </div>
                 </div>
-
-              </div>
+              </Link>
             ))}
           </div>
         )}

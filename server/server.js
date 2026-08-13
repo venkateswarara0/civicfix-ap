@@ -39,14 +39,13 @@ app.use('/api/sachivalayams', sachivalayamRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Serve built frontend assets in production mode
+// Serve built frontend assets in production mode (standalone server)
 const clientBuildPath = path.join(__dirname, '../client/dist');
 if (fs.existsSync(clientBuildPath)) {
   app.use(express.static(clientBuildPath));
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
-  console.log(`📦 Serving production client build from ${clientBuildPath}`);
 }
 
 // Global Error Handler
@@ -55,13 +54,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-// Initialize database and start server
-initDb()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 CivicFix Server running on http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Failed to initialize database:', err);
+// Auto initialize SQLite DB
+initDb().catch((err) => {
+  console.error('Failed to initialize database:', err);
+});
+
+// Standalone server mode
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 CivicFix Server running on http://localhost:${PORT}`);
   });
+}
+
+export default app;

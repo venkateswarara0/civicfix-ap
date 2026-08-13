@@ -3,8 +3,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('civicfix_token'));
+  const [token, setToken] = useState(() => localStorage.getItem('civicfix_token'));
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('civicfix_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,12 +35,18 @@ export function AuthProvider({ children }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        localStorage.setItem('civicfix_user', JSON.stringify(data.user));
       } else {
-        logout();
+        // Keep offline user session from localStorage if valid token exists
+        const savedUser = localStorage.getItem('civicfix_user');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (e) {}
+        }
       }
     } catch (err) {
-      console.error('Failed to fetch current user:', err);
-      logout();
+      console.error('Failed to fetch current user profile:', err);
     } finally {
       setLoading(false);
     }
@@ -38,12 +54,14 @@ export function AuthProvider({ children }) {
 
   const login = (authToken, userData) => {
     localStorage.setItem('civicfix_token', authToken);
+    localStorage.setItem('civicfix_user', JSON.stringify(userData));
     setToken(authToken);
     setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem('civicfix_token');
+    localStorage.removeItem('civicfix_user');
     setToken(null);
     setUser(null);
   };

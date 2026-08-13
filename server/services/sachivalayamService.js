@@ -16,18 +16,16 @@ export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Universal Nearest-Neighbor Sachivalayam Routing Engine
- * Priority:
- * 1. Exact Jurisdiction bounding box geofence match
- * 2. Nearest registered Sachivalayam by Haversine Distance
+ * Pure Real-Time GPS Routing Engine for AP Sachivalayams
+ * Finds the nearest Sachivalayam registered by an actual Sachivalayam Head.
  */
 export async function findResponsibleSachivalayam(latitude, longitude) {
   let lat = parseFloat(latitude);
   let lng = parseFloat(longitude);
 
   if (isNaN(lat) || isNaN(lng)) {
-    lat = 16.4181;
-    lng = 81.0170;
+    lat = 16.442;
+    lng = 81.002;
   }
 
   // Auto-correct if lat and lng are flipped (lat > 50° is Longitude in India!)
@@ -41,17 +39,17 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
 
   if (!sachivalayams || sachivalayams.length === 0) {
     return {
-      sachivalayam_id: 6,
-      sachivalayam_name: 'Gudivada Municipal Ward Sachivalayam 05',
-      sachivalayam_code: 'AP-KRI-GDV-005',
-      assigned_official_id: 5,
-      distance_km: 0.1,
-      assignment_method: 'DEFAULT',
-      jurisdiction: 'Gudivada, Krishna District'
+      sachivalayam_id: null,
+      sachivalayam_name: 'Awaiting Local Sachivalayam Head Registration',
+      sachivalayam_code: 'AP-PORTAL',
+      assigned_official_id: null,
+      distance_km: 0,
+      assignment_method: 'PENDING_REGISTRATION',
+      jurisdiction: 'Andhra Pradesh Grama & Ward Sachivalayam Direct Connect'
     };
   }
 
-  // 1. Try Geofence / Bounding Box Match
+  // 1. Try Exact Jurisdiction Bounding Box Match
   for (const s of sachivalayams) {
     if (s.min_lat && s.max_lat && s.min_lng && s.max_lng) {
       if (
@@ -70,7 +68,7 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
           sachivalayam_id: s.id,
           sachivalayam_name: s.name,
           sachivalayam_code: s.code,
-          assigned_official_id: official ? official.id : 5,
+          assigned_official_id: official ? official.id : null,
           distance_km: parseFloat(dist.toFixed(2)),
           assignment_method: 'JURISDICTION_MATCH',
           jurisdiction: `${s.village}, ${s.mandal}, ${s.district}`
@@ -79,7 +77,7 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
     }
   }
 
-  // 2. Pure Nearest Registered Sachivalayam by Haversine Distance
+  // 2. Pure Nearest Distance Matching to Registered Sachivalayams
   let nearest = null;
   let minDistance = Infinity;
 
@@ -91,7 +89,8 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
     }
   }
 
-  if (nearest) {
+  // Only assign if the nearest registered Sachivalayam is within reasonable local distance (<= 50 km)
+  if (nearest && minDistance <= 50) {
     const official = await dbGet(
       "SELECT id FROM users WHERE role = 'OFFICIAL' AND sachivalayam_id = ? LIMIT 1",
       [nearest.id]
@@ -101,22 +100,21 @@ export async function findResponsibleSachivalayam(latitude, longitude) {
       sachivalayam_id: nearest.id,
       sachivalayam_name: nearest.name,
       sachivalayam_code: nearest.code,
-      assigned_official_id: official ? official.id : 5,
+      assigned_official_id: official ? official.id : null,
       distance_km: parseFloat(minDistance.toFixed(2)),
       assignment_method: 'NEAREST_DISTANCE',
       jurisdiction: `${nearest.village}, ${nearest.mandal}, ${nearest.district}`
     };
   }
 
-  // Final fallback
-  const defaultSach = sachivalayams.find(s => s.id === 6) || sachivalayams[0];
+  // If no Sachivalayam has been registered in this area yet
   return {
-    sachivalayam_id: defaultSach.id,
-    sachivalayam_name: defaultSach.name,
-    sachivalayam_code: defaultSach.code,
-    assigned_official_id: 5,
-    distance_km: 0.5,
-    assignment_method: 'FALLBACK_CLOSEST',
-    jurisdiction: `${defaultSach.village}, ${defaultSach.mandal}`
+    sachivalayam_id: null,
+    sachivalayam_name: 'Awaiting Local Sachivalayam Registration',
+    sachivalayam_code: 'AP-PENDING',
+    assigned_official_id: null,
+    distance_km: parseFloat(minDistance.toFixed(2)),
+    assignment_method: 'PENDING_LOCAL_OFFICIAL',
+    jurisdiction: 'AP Grama & Ward Sachivalayam Portal'
   };
 }

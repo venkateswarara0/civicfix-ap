@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, User, Lock, Mail, Phone, Sparkles, ArrowRight } from 'lucide-react';
+import { ShieldAlert, User, Lock, Mail, Phone, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function AuthPage() {
   const { login } = useAuth();
@@ -32,7 +32,15 @@ export default function AuthPage() {
         body: JSON.stringify(body)
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: `Server error (${res.status}): ${text.substring(0, 100)}` };
+      }
+
       if (res.ok) {
         login(data.token, data.user);
         if (data.user.role === 'ADMIN') navigate('/admin/dashboard');
@@ -42,7 +50,8 @@ export default function AuthPage() {
         setError(data.error || 'Authentication failed');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      console.error('Auth error:', err);
+      setError('Connection error: Unable to reach authentication server');
     } finally {
       setLoading(false);
     }
@@ -51,21 +60,38 @@ export default function AuthPage() {
   const handleQuickDemo = async (demoEmail) => {
     setEmail(demoEmail);
     setPassword('password123');
+    setError(null);
+    setLoading(true);
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: demoEmail, password: 'password123' })
       });
-      const data = await res.json();
+
+      const contentType = res.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { error: `Server error (${res.status}): ${text.substring(0, 100)}` };
+      }
+
       if (res.ok) {
         login(data.token, data.user);
         if (data.user.role === 'ADMIN') navigate('/admin/dashboard');
         else if (data.user.role === 'OFFICIAL') navigate('/official/dashboard');
         else navigate('/track');
+      } else {
+        setError(data.error || 'Demo login failed');
       }
     } catch (err) {
-      setError('Demo login error');
+      console.error('Demo auth error:', err);
+      setError('Connection error logging into demo account');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,6 +121,7 @@ export default function AuthPage() {
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handleQuickDemo('citizen@civicfix.in')}
+              disabled={loading}
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-left border border-slate-800"
             >
               <div className="text-xs font-bold text-blue-400">Citizen</div>
@@ -103,6 +130,7 @@ export default function AuthPage() {
 
             <button
               onClick={() => handleQuickDemo('official.patamata@civicfix.in')}
+              disabled={loading}
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-left border border-slate-800"
             >
               <div className="text-xs font-bold text-amber-400">Official</div>
@@ -111,6 +139,7 @@ export default function AuthPage() {
 
             <button
               onClick={() => handleQuickDemo('admin@civicfix.in')}
+              disabled={loading}
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-left border border-slate-800"
             >
               <div className="text-xs font-bold text-purple-400">State Admin</div>
@@ -195,7 +224,15 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition"
           >
-            {isRegister ? 'Create Account' : 'Sign In'} <ArrowRight className="w-4 h-4" />
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+              </>
+            ) : (
+              <>
+                {isRegister ? 'Create Account' : 'Sign In'} <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
 
           <div className="text-center pt-2">

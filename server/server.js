@@ -28,16 +28,16 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({ status: 'OK', service: 'CivicFix AP Backend API', time: new Date().toISOString() });
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/complaints', complaintRoutes);
-app.use('/api/sachivalayams', sachivalayamRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/notifications', notificationRoutes);
+// API Routes (mounted on both /api/... and /... for serverless compatibility)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/complaints', '/complaints'], complaintRoutes);
+app.use(['/api/sachivalayams', '/sachivalayams'], sachivalayamRoutes);
+app.use(['/api/admin', '/admin'], adminRoutes);
+app.use(['/api/notifications', '/notifications'], notificationRoutes);
 
 // Serve built frontend assets in production mode (standalone server)
 const clientBuildPath = path.join(__dirname, '../client/dist');
@@ -54,7 +54,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-// Auto initialize SQLite DB
+// Auto initialize DB
 initDb().catch((err) => {
   console.error('Failed to initialize database:', err);
 });
